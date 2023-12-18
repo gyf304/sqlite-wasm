@@ -1,6 +1,6 @@
 {
   "name": "@yifangu/sqlite",
-  "version": "1.0.0-alpha.13",
+  "version": "1.0.0-alpha.14",
   "repository": "https://github.com/gyf304/sqlite-wasm",
   "author": "Yifan Gu <gyf304@users.noreply.github.com>",
   "license": "MIT",
