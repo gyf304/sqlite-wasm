@@ -16,9 +16,12 @@ SQLITE_FLAGS = \
 	-DSQLITE_OMIT_LOAD_EXTENSION \
 	-DSQLITE_OMIT_UTF16
 
-.PHONY: all clean
+.PHONY: all clean update
 
 all: sqlite/sqlite3.wasm
+
+update:
+	./scripts/update-sqlite.sh
 
 sqlite/sqlite3.o: sqlite/sqlite3.c sqlite/sqlite3.h
 	$(CC) $(CFLAGS) $(SQLITE_FLAGS) \

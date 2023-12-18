@@ -200,7 +200,7 @@ async function main() {
 		unimplementedImportsPreamble,
 		...importApis.map(genPlaceholder).map((x) => "\t" + x + "\n"),
 		unimplementedImportsPostamble,
-	]);
+	].join(""));
 }
 
 main();
