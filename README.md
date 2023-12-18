@@ -1,6 +1,5 @@
 # SQLite, compiled to WASM
 
-![coverage](./badges/coverage.svg)
 [![npm](./badges/npm.svg)](https://www.npmjs.com/package/@yifangu/sqlite)
 
 ## Install

@@ -65,7 +65,7 @@ export class SQLite {
 						...imports,
 					},
 				});
-		
+
 				sqlite = new SQLite(instance);
 				sqlite.initialize();
 				return sqlite;
@@ -195,7 +195,7 @@ export class SQLiteDB {
 		const results: SQLiteExecValue[][] = [];
 		const pSql = this.utils.cString(sql);
 		const pzErr = this.utils.malloc(4);
-	
+
 		this.sqlite._execCallback = (i, nCols, azCols, azColNames) => {
 			const result: SQLiteExecValue[] = [];
 			results.push(result);
@@ -227,7 +227,7 @@ export class SQLiteDB {
 			out.set(this.utils.u8.slice(pOut, pOut + size));
 			this.exports.sqlite3_free(pOut);
 		}
-		return out;
+		return out === null ? null : out.buffer as ArrayBuffer;
 	}
 
 	public deserialize(data: ArrayBuffer, schema: string = "main", mFlags: number = 0): void {
@@ -372,7 +372,7 @@ export class SQLiteStatement {
 		const buf = new Uint8Array(len);
 		const window = this.utils.u8.subarray(ptr, ptr + len);
 		buf.set(window);
-		return buf.buffer;
+		return buf.buffer as ArrayBuffer;
 	}
 
 	public columnDouble(i: number): number {

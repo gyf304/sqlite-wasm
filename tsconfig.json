@@ -1,15 +1,14 @@
 {
 	"compilerOptions": {
-		"target": "es2016",
-		"module": "commonjs",
-		"moduleResolution": "node",
+		"target": "es2020",
+		"lib": ["es2020"],
+		"types": ["bun-types"],
+		"module": "ESNext",
 		"skipLibCheck": true,
 		"strict": true,
 		"outDir": "./dist/cjs",
 		"rootDir": "./src",
 		"declaration": true,
 	},
-	"include": [
-		"src/**/*.ts"
-	]
+	"include": ["src"]
 }
