@@ -322,8 +322,8 @@ export interface SQLiteExports extends WebAssembly.Exports {
 	sqlite3changegroup_output_strm: (a: CPointer, xOutput: CFunctionPointer, pOut: CPointer) => CInteger;
 	sqlite3rebaser_rebase_strm: (pRebaser: CPointer, xInput: CFunctionPointer, pIn: CPointer, xOutput: CFunctionPointer, pOut: CPointer) => CInteger;
 	sqlite3session_config: (op: CInteger, pArg: CPointer) => CInteger;
-	sqlite3_ext_vfs_register: (name: CString, makeDflt: CInteger, pOutVfsId: CPointer) => CInteger;
-	sqlite3_ext_vfs_unregister: (vfsId: CInteger) => CInteger;
+	sqlite3_ext_vfs_register: (name: CString, makeDflt: CInteger, c: CPointer) => CInteger;
+	sqlite3_ext_vfs_unregister: (pVfs: CPointer) => CInteger;
 	sqlite3_ext_exec: (db: CPointer, sql: CString, id: CInteger, d: CPointer) => CInteger;
 
 	memory: WebAssembly.Memory;
@@ -333,26 +333,26 @@ export interface SQLiteImports {
 	sqlite3_ext_os_init: () => CInteger;
 	sqlite3_ext_os_end: () => CInteger;
 	sqlite3_ext_exec_callback: (id: CInteger, nCols: CInteger, azCols: CPointer, azColNames: CPointer) => CInteger;
-	sqlite3_ext_io_close: (vfsId: CInteger, fileId: CInteger) => CInteger;
-	sqlite3_ext_io_read: (vfsId: CInteger, fileId: CInteger, pBuf: CPointer, iAmt: CInteger, iOfst: CInteger) => CInteger;
-	sqlite3_ext_io_write: (vfsId: CInteger, fileId: CInteger, pBuf: CPointer, iAmt: CInteger, iOfst: CInteger) => CInteger;
-	sqlite3_ext_io_truncate: (vfsId: CInteger, fileId: CInteger, size: CInteger) => CInteger;
-	sqlite3_ext_io_sync: (vfsId: CInteger, fileId: CInteger, flags: CInteger) => CInteger;
-	sqlite3_ext_io_file_size: (vfsId: CInteger, fileId: CInteger, pSize: CPointer) => CInteger;
-	sqlite3_ext_io_lock: (vfsId: CInteger, fileId: CInteger, locktype: CInteger) => CInteger;
-	sqlite3_ext_io_unlock: (vfsId: CInteger, fileId: CInteger, locktype: CInteger) => CInteger;
-	sqlite3_ext_io_check_reserved_lock: (vfsId: CInteger, fileId: CInteger, pResOut: CPointer) => CInteger;
-	sqlite3_ext_io_file_control: (vfsId: CInteger, fileId: CInteger, op: CInteger, pArg: CPointer) => CInteger;
-	sqlite3_ext_io_sector_size: (vfsId: CInteger, fileId: CInteger) => CInteger;
-	sqlite3_ext_io_device_characteristics: (vfsId: CInteger, fileId: CInteger) => CInteger;
-	sqlite3_ext_vfs_open: (id: CInteger, zName: CString, pOutfileId: CPointer, flags: CInteger, pOutFlags: CPointer) => CInteger;
-	sqlite3_ext_vfs_delete: (id: CInteger, zName: CString, syncDir: CInteger) => CInteger;
-	sqlite3_ext_vfs_access: (id: CInteger, zName: CString, flags: CInteger, pResOut: CPointer) => CInteger;
-	sqlite3_ext_vfs_full_pathname: (id: CInteger, zName: CString, nOut: CInteger, zOut: CPointer) => CInteger;
-	sqlite3_ext_vfs_randomness: (id: CInteger, nByte: CInteger, zOut: CPointer) => CInteger;
-	sqlite3_ext_vfs_sleep: (id: CInteger, microseconds: CInteger) => CInteger;
-	sqlite3_ext_vfs_current_time: (id: CInteger, pTimeOut: CPointer) => CInteger;
-	sqlite3_ext_vfs_get_last_error: (id: CInteger, nByte: CInteger, zOut: CPointer) => CInteger;
+	sqlite3_ext_io_close: (pVfs: CPointer, fileId: CInteger) => CInteger;
+	sqlite3_ext_io_read: (pVfs: CPointer, fileId: CInteger, pBuf: CPointer, iAmt: CInteger, iOfst: CInteger64) => CInteger;
+	sqlite3_ext_io_write: (pVfs: CPointer, fileId: CInteger, pBuf: CPointer, iAmt: CInteger, iOfst: CInteger64) => CInteger;
+	sqlite3_ext_io_truncate: (pVfs: CPointer, fileId: CInteger, size: CInteger64) => CInteger;
+	sqlite3_ext_io_sync: (pVfs: CPointer, fileId: CInteger, flags: CInteger) => CInteger;
+	sqlite3_ext_io_file_size: (pVfs: CPointer, fileId: CInteger, pSize: CPointer) => CInteger;
+	sqlite3_ext_io_lock: (pVfs: CPointer, fileId: CInteger, locktype: CInteger) => CInteger;
+	sqlite3_ext_io_unlock: (pVfs: CPointer, fileId: CInteger, locktype: CInteger) => CInteger;
+	sqlite3_ext_io_check_reserved_lock: (pVfs: CPointer, fileId: CInteger, pResOut: CPointer) => CInteger;
+	sqlite3_ext_io_file_control: (pVfs: CPointer, fileId: CInteger, op: CInteger, pArg: CPointer) => CInteger;
+	sqlite3_ext_io_sector_size: (pVfs: CPointer, fileId: CInteger) => CInteger;
+	sqlite3_ext_io_device_characteristics: (pVfs: CPointer, fileId: CInteger) => CInteger;
+	sqlite3_ext_vfs_open: (pVfs: CPointer, zName: CString, pOutfileId: CPointer, flags: CInteger, pOutFlags: CPointer) => CInteger;
+	sqlite3_ext_vfs_delete: (pVfs: CPointer, zName: CString, syncDir: CInteger) => CInteger;
+	sqlite3_ext_vfs_access: (pVfs: CPointer, zName: CString, flags: CInteger, pResOut: CPointer) => CInteger;
+	sqlite3_ext_vfs_full_pathname: (pVfs: CPointer, zName: CString, nOut: CInteger, zOut: CPointer) => CInteger;
+	sqlite3_ext_vfs_randomness: (pVfs: CPointer, nByte: CInteger, zOut: CPointer) => CInteger;
+	sqlite3_ext_vfs_sleep: (pVfs: CPointer, microseconds: CInteger) => CInteger;
+	sqlite3_ext_vfs_current_time: (pVfs: CPointer, pTimeOut: CPointer) => CInteger;
+	sqlite3_ext_vfs_get_last_error: (pVfs: CPointer, nByte: CInteger, zOut: CPointer) => CInteger;
 }
 
 export class SQLiteUnimplementedImportError extends Error {

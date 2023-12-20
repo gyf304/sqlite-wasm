@@ -14,3 +14,7 @@ node_modules
 .nyc_output
 /coverage
 /docs
+
+*.db
+bun.lockb
+*.tgz

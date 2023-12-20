@@ -18,67 +18,67 @@ __attribute__((import_module("imports"),import_name("sqlite3_ext_exec_callback")
 SQLITE_IMPORTED_API int sqlite3_ext_exec_callback(int id, int nCols, char** azCols, char** azColNames);
 
 __attribute__((import_module("imports"),import_name("sqlite3_ext_io_close")))
-SQLITE_IMPORTED_API int sqlite3_ext_io_close(int vfsId, int fileId);
+SQLITE_IMPORTED_API int sqlite3_ext_io_close(sqlite3_vfs *pVfs, int fileId);
 
 __attribute__((import_module("imports"),import_name("sqlite3_ext_io_read")))
-SQLITE_IMPORTED_API int sqlite3_ext_io_read(int vfsId, int fileId, void *pBuf, int iAmt, int iOfst);
+SQLITE_IMPORTED_API int sqlite3_ext_io_read(sqlite3_vfs *pVfs, int fileId, void *pBuf, int iAmt, sqlite3_int64 iOfst);
 
 __attribute__((import_module("imports"),import_name("sqlite3_ext_io_write")))
-SQLITE_IMPORTED_API int sqlite3_ext_io_write(int vfsId, int fileId, const void *pBuf, int iAmt, int iOfst);
+SQLITE_IMPORTED_API int sqlite3_ext_io_write(sqlite3_vfs *pVfs, int fileId, const void *pBuf, int iAmt, sqlite3_int64 iOfst);
 
 __attribute__((import_module("imports"),import_name("sqlite3_ext_io_truncate")))
-SQLITE_IMPORTED_API int sqlite3_ext_io_truncate(int vfsId, int fileId, int size);
+SQLITE_IMPORTED_API int sqlite3_ext_io_truncate(sqlite3_vfs *pVfs, int fileId, sqlite3_int64 size);
 
 __attribute__((import_module("imports"),import_name("sqlite3_ext_io_sync")))
-SQLITE_IMPORTED_API int sqlite3_ext_io_sync(int vfsId, int fileId, int flags);
+SQLITE_IMPORTED_API int sqlite3_ext_io_sync(sqlite3_vfs *pVfs, int fileId, int flags);
 
 __attribute__((import_module("imports"),import_name("sqlite3_ext_io_file_size")))
-SQLITE_IMPORTED_API int sqlite3_ext_io_file_size(int vfsId, int fileId, int *pSize);
+SQLITE_IMPORTED_API int sqlite3_ext_io_file_size(sqlite3_vfs *pVfs, int fileId, sqlite3_int64 *pSize);
 
 __attribute__((import_module("imports"),import_name("sqlite3_ext_io_lock")))
-SQLITE_IMPORTED_API int sqlite3_ext_io_lock(int vfsId, int fileId, int locktype);
+SQLITE_IMPORTED_API int sqlite3_ext_io_lock(sqlite3_vfs *pVfs, int fileId, int locktype);
 
 __attribute__((import_module("imports"),import_name("sqlite3_ext_io_unlock")))
-SQLITE_IMPORTED_API int sqlite3_ext_io_unlock(int vfsId, int fileId, int locktype);
+SQLITE_IMPORTED_API int sqlite3_ext_io_unlock(sqlite3_vfs *pVfs, int fileId, int locktype);
 
 __attribute__((import_module("imports"),import_name("sqlite3_ext_io_check_reserved_lock")))
-SQLITE_IMPORTED_API int sqlite3_ext_io_check_reserved_lock(int vfsId, int fileId, int *pResOut);
+SQLITE_IMPORTED_API int sqlite3_ext_io_check_reserved_lock(sqlite3_vfs *pVfs, int fileId, int *pResOut);
 
 __attribute__((import_module("imports"),import_name("sqlite3_ext_io_file_control")))
-SQLITE_IMPORTED_API int sqlite3_ext_io_file_control(int vfsId, int fileId, int op, void *pArg);
+SQLITE_IMPORTED_API int sqlite3_ext_io_file_control(sqlite3_vfs *pVfs, int fileId, int op, void *pArg);
 
 __attribute__((import_module("imports"),import_name("sqlite3_ext_io_sector_size")))
-SQLITE_IMPORTED_API int sqlite3_ext_io_sector_size(int vfsId, int fileId);
+SQLITE_IMPORTED_API int sqlite3_ext_io_sector_size(sqlite3_vfs *pVfs, int fileId);
 
 __attribute__((import_module("imports"),import_name("sqlite3_ext_io_device_characteristics")))
-SQLITE_IMPORTED_API int sqlite3_ext_io_device_characteristics(int vfsId, int fileId);
+SQLITE_IMPORTED_API int sqlite3_ext_io_device_characteristics(sqlite3_vfs *pVfs, int fileId);
 
 __attribute__((import_module("imports"),import_name("sqlite3_ext_vfs_open")))
-SQLITE_IMPORTED_API int sqlite3_ext_vfs_open(int id, const char *zName, int *pOutfileId, int flags, int *pOutFlags);
+SQLITE_IMPORTED_API int sqlite3_ext_vfs_open(sqlite3_vfs *pVfs, const char *zName, int *pOutfileId, int flags, int *pOutFlags);
 
 __attribute__((import_module("imports"),import_name("sqlite3_ext_vfs_delete")))
-SQLITE_IMPORTED_API int sqlite3_ext_vfs_delete(int id, const char *zName, int syncDir);
+SQLITE_IMPORTED_API int sqlite3_ext_vfs_delete(sqlite3_vfs *pVfs, const char *zName, int syncDir);
 
 __attribute__((import_module("imports"),import_name("sqlite3_ext_vfs_access")))
-SQLITE_IMPORTED_API int sqlite3_ext_vfs_access(int id, const char *zName, int flags, int *pResOut);
+SQLITE_IMPORTED_API int sqlite3_ext_vfs_access(sqlite3_vfs *pVfs, const char *zName, int flags, int *pResOut);
 
 __attribute__((import_module("imports"),import_name("sqlite3_ext_vfs_full_pathname")))
-SQLITE_IMPORTED_API int sqlite3_ext_vfs_full_pathname(int id, const char *zName, int nOut, char *zOut);
+SQLITE_IMPORTED_API int sqlite3_ext_vfs_full_pathname(sqlite3_vfs *pVfs, const char *zName, int nOut, char *zOut);
 
 __attribute__((import_module("imports"),import_name("sqlite3_ext_vfs_randomness")))
-SQLITE_IMPORTED_API int sqlite3_ext_vfs_randomness(int id, int nByte, char *zOut);
+SQLITE_IMPORTED_API int sqlite3_ext_vfs_randomness(sqlite3_vfs *pVfs, int nByte, char *zOut);
 
 __attribute__((import_module("imports"),import_name("sqlite3_ext_vfs_sleep")))
-SQLITE_IMPORTED_API int sqlite3_ext_vfs_sleep(int id, int microseconds);
+SQLITE_IMPORTED_API int sqlite3_ext_vfs_sleep(sqlite3_vfs *pVfs, int microseconds);
 
 __attribute__((import_module("imports"),import_name("sqlite3_ext_vfs_current_time")))
-SQLITE_IMPORTED_API int sqlite3_ext_vfs_current_time(int id, double *pTimeOut);
+SQLITE_IMPORTED_API int sqlite3_ext_vfs_current_time(sqlite3_vfs *pVfs, double *pTimeOut);
 
 __attribute__((import_module("imports"),import_name("sqlite3_ext_vfs_get_last_error")))
-SQLITE_IMPORTED_API int sqlite3_ext_vfs_get_last_error(int id, int nByte, char *zOut);
+SQLITE_IMPORTED_API int sqlite3_ext_vfs_get_last_error(sqlite3_vfs *pVfs, int nByte, char *zOut);
 
-SQLITE_EXTRA_API int sqlite3_ext_vfs_register(const char *name, int makeDflt, int *pOutVfsId);
+SQLITE_EXTRA_API int sqlite3_ext_vfs_register(const char *name, int makeDflt, sqlite3_vfs **ppOutVfs);
 
-SQLITE_EXTRA_API int sqlite3_ext_vfs_unregister(int vfsId);
+SQLITE_EXTRA_API int sqlite3_ext_vfs_unregister(sqlite3_vfs *pVfs);
 
 SQLITE_EXTRA_API int sqlite3_ext_exec(sqlite3 *db, const char *sql, int id, char **errmsg);

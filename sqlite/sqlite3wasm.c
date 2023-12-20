@@ -7,20 +7,18 @@
 #define MAX_EXT_VFS 32
 #endif
 
-static sqlite3_vfs *ext_vfs[MAX_EXT_VFS] = { 0 };
-
 typedef struct sqlite3_ext_file sqlite3_ext_file;
 struct sqlite3_ext_file
 {
 	sqlite3_file base;
-	int vfsId;
+	sqlite3_vfs *pVfs;
 	int fileId;
 };
 
 static int io_close(sqlite3_file *pFile)
 {
 	sqlite3_ext_file *p = (sqlite3_ext_file *)pFile;
-	int rc = sqlite3_ext_io_close(p->vfsId, p->fileId);
+	int rc = sqlite3_ext_io_close(p->pVfs, p->fileId);
 	sqlite3_free(p);
 	return rc;
 }
@@ -28,70 +26,67 @@ static int io_close(sqlite3_file *pFile)
 static int io_read(sqlite3_file *pFile, void *pBuf, int iAmt, sqlite3_int64 iOfst)
 {
 	sqlite3_ext_file *p = (sqlite3_ext_file *)pFile;
-	return sqlite3_ext_io_read(p->vfsId, p->fileId, pBuf, iAmt, iOfst);
+	return sqlite3_ext_io_read(p->pVfs, p->fileId, pBuf, iAmt, iOfst);
 }
 
 static int io_write(sqlite3_file *pFile, const void *pBuf, int iAmt, sqlite3_int64 iOfst)
 {
 	sqlite3_ext_file *p = (sqlite3_ext_file *)pFile;
-	return sqlite3_ext_io_write(p->vfsId, p->fileId, pBuf, iAmt, iOfst);
+	return sqlite3_ext_io_write(p->pVfs, p->fileId, pBuf, iAmt, iOfst);
 }
 
 static int io_truncate(sqlite3_file *pFile, sqlite3_int64 size)
 {
 	sqlite3_ext_file *p = (sqlite3_ext_file *)pFile;
-	return sqlite3_ext_io_truncate(p->vfsId, p->fileId, size);
+	return sqlite3_ext_io_truncate(p->pVfs, p->fileId, size);
 }
 
 static int io_sync(sqlite3_file *pFile, int flags)
 {
 	sqlite3_ext_file *p = (sqlite3_ext_file *)pFile;
-	return sqlite3_ext_io_sync(p->vfsId, p->fileId, flags);
+	return sqlite3_ext_io_sync(p->pVfs, p->fileId, flags);
 }
 
 static int io_file_size(sqlite3_file *pFile, sqlite3_int64 *pSize)
 {
 	sqlite3_ext_file *p = (sqlite3_ext_file *)pFile;
-	int size = 0;
-	int rc = sqlite3_ext_io_file_size(p->vfsId, p->fileId, &size);
-	*pSize = size;
-	return rc;
+	return sqlite3_ext_io_file_size(p->pVfs, p->fileId, pSize);
 }
 
 static int io_lock(sqlite3_file *pFile, int locktype)
 {
 	sqlite3_ext_file *p = (sqlite3_ext_file *)pFile;
-	return sqlite3_ext_io_lock(p->vfsId, p->fileId, locktype);
+	return sqlite3_ext_io_lock(p->pVfs, p->fileId, locktype);
 }
 
 static int io_unlock(sqlite3_file *pFile, int locktype)
 {
 	sqlite3_ext_file *p = (sqlite3_ext_file *)pFile;
-	return sqlite3_ext_io_unlock(p->vfsId, p->fileId, locktype);
+	return sqlite3_ext_io_unlock(p->pVfs, p->fileId, locktype);
 }
 
 static int io_check_reserved_lock(sqlite3_file *pFile, int *pResOut)
 {
 	sqlite3_ext_file *p = (sqlite3_ext_file *)pFile;
-	return sqlite3_ext_io_check_reserved_lock(p->vfsId, p->fileId, pResOut);
+	return sqlite3_ext_io_check_reserved_lock(p->pVfs, p->fileId, pResOut);
 }
 
 static int io_file_control(sqlite3_file *pFile, int op, void *pArg)
 {
 	sqlite3_ext_file *p = (sqlite3_ext_file *)pFile;
-	return sqlite3_ext_io_file_control(p->vfsId, p->fileId, op, pArg);
+	return sqlite3_ext_io_file_control(p->pVfs, p->fileId, op, pArg);
 }
 
 static int io_sector_size(sqlite3_file *pFile)
 {
 	sqlite3_ext_file *p = (sqlite3_ext_file *)pFile;
-	return sqlite3_ext_io_sector_size(p->vfsId, p->fileId);
+	return sqlite3_ext_io_sector_size(p->pVfs, p->fileId);
 }
 
 static int io_device_characteristics(sqlite3_file *pFile)
 {
 	sqlite3_ext_file *p = (sqlite3_ext_file *)pFile;
-	return sqlite3_ext_io_device_characteristics(p->vfsId, p->fileId);
+	return sqlite3_ext_io_device_characteristics(p->pVfs, p->fileId);
 }
 
 static sqlite3_io_methods io_methods = {
@@ -110,11 +105,10 @@ static sqlite3_io_methods io_methods = {
 	io_device_characteristics,
 };
 
-static int vfs_open(sqlite3_vfs *vfs, const char *zName, sqlite3_file *file, int flags, int *pOutFlags)
+static int vfs_open(sqlite3_vfs *pVfs, const char *zName, sqlite3_file *file, int flags, int *pOutFlags)
 {
-	int id = (int)vfs->pAppData;
 	int fileId = 0;
-	int rc = sqlite3_ext_vfs_open(id, zName, &fileId, flags, pOutFlags);
+	int rc = sqlite3_ext_vfs_open(pVfs, zName, &fileId, flags, pOutFlags);
 	if (fileId == 0) {
 		return SQLITE_MISUSE;
 	}
@@ -122,36 +116,33 @@ static int vfs_open(sqlite3_vfs *vfs, const char *zName, sqlite3_file *file, int
 	{
 		sqlite3_ext_file *ext = (sqlite3_ext_file *)file;
 		ext->base.pMethods = &io_methods;
-		ext->vfsId = id;
+		ext->pVfs = pVfs;
 		ext->fileId = fileId;
 	}
 	return rc;
 }
 
-static int vfs_delete(sqlite3_vfs *vfs, const char *zName, int syncDir)
+static int vfs_delete(sqlite3_vfs *pVfs, const char *zName, int syncDir)
 {
-	int id = (int)vfs->pAppData;
-	return sqlite3_ext_vfs_delete(id, zName, syncDir);
+	return sqlite3_ext_vfs_delete(pVfs, zName, syncDir);
 }
 
-static int vfs_access(sqlite3_vfs *vfs, const char *zName, int flags, int *pResOut)
+static int vfs_access(sqlite3_vfs *pVfs, const char *zName, int flags, int *pResOut)
 {
-	int id = (int)vfs->pAppData;
-	return sqlite3_ext_vfs_access(id, zName, flags, pResOut);
+	return sqlite3_ext_vfs_access(pVfs, zName, flags, pResOut);
 }
 
-static int vfs_full_pathname(sqlite3_vfs *vfs, const char *zName, int nOut, char *zOut)
+static int vfs_full_pathname(sqlite3_vfs *pVfs, const char *zName, int nOut, char *zOut)
 {
-	int id = (int)vfs->pAppData;
-	return sqlite3_ext_vfs_full_pathname(id, zName, nOut, zOut);
+	return sqlite3_ext_vfs_full_pathname(pVfs, zName, nOut, zOut);
 }
 
-static void *vfs_dlopen(sqlite3_vfs *vfs, const char *zFilename)
+static void *vfs_dlopen(sqlite3_vfs *pVfs, const char *zFilename)
 {
 	return NULL;
 }
 
-static void vfs_dlerror(sqlite3_vfs *vfs, int nByte, char *zErrMsg)
+static void vfs_dlerror(sqlite3_vfs *pVfs, int nByte, char *zErrMsg)
 {
 	if (nByte > 0)
 	{
@@ -160,40 +151,24 @@ static void vfs_dlerror(sqlite3_vfs *vfs, int nByte, char *zErrMsg)
 	}
 }
 
-static int vfs_randomness(sqlite3_vfs *vfs, int nByte, char *zOut)
+static int vfs_randomness(sqlite3_vfs *pVfs, int nByte, char *zOut)
 {
-	int id = (int)vfs->pAppData;
-	return sqlite3_ext_vfs_randomness(id, nByte, zOut);
+	return sqlite3_ext_vfs_randomness(pVfs, nByte, zOut);
 }
 
-static int vfs_sleep(sqlite3_vfs *vfs, int microseconds)
+static int vfs_sleep(sqlite3_vfs *pVfs, int microseconds)
 {
-	int id = (int)vfs->pAppData;
-	return sqlite3_ext_vfs_sleep(id, microseconds);
+	return sqlite3_ext_vfs_sleep(pVfs, microseconds);
 }
 
-static int vfs_current_time(sqlite3_vfs *vfs, double *pTimeOut)
+static int vfs_current_time(sqlite3_vfs *pVfs, double *pTimeOut)
 {
-	int id = (int)vfs->pAppData;
-	return sqlite3_ext_vfs_current_time(id, pTimeOut);
+	return sqlite3_ext_vfs_current_time(pVfs, pTimeOut);
 }
 
-static int vfs_get_last_error(sqlite3_vfs *vfs, int nByte, char *zOut)
+static int vfs_get_last_error(sqlite3_vfs *pVfs, int nByte, char *zOut)
 {
-	int id = (int)vfs->pAppData;
-	return sqlite3_ext_vfs_get_last_error(id, nByte, zOut);
-}
-
-static int next_ext_vfs_id()
-{
-	for (int i = 0; i < MAX_EXT_VFS; i++)
-	{
-		if (ext_vfs[i] == NULL)
-		{
-			return i;
-		}
-	}
-	return -1;
+	return sqlite3_ext_vfs_get_last_error(pVfs, nByte, zOut);
 }
 
 static int exec_callback(void *pArg, int nCols, char **azCols, char **azColNames)
@@ -201,24 +176,17 @@ static int exec_callback(void *pArg, int nCols, char **azCols, char **azColNames
 	return sqlite3_ext_exec_callback((int)pArg, nCols, azCols, azColNames);
 }
 
-int sqlite3_ext_vfs_register(const char *name, int makeDflt, int *pOutVfsId)
+int sqlite3_ext_vfs_register(const char *name, int makeDflt, sqlite3_vfs **ppOutVfs)
 {
-	int vfsId = next_ext_vfs_id();
-	if (vfsId < 0)
-	{
-		return SQLITE_NOMEM;
-	}
-
-	if (pOutVfsId == NULL)
-	{
+	if (ppOutVfs == NULL) {
 		return SQLITE_MISUSE;
 	}
 
-	sqlite3_vfs *vfs = sqlite3_malloc(sizeof(sqlite3_vfs));
-	if (vfs == NULL) {
+	sqlite3_vfs *pVfs = sqlite3_malloc(sizeof(sqlite3_vfs));
+	if (pVfs == NULL) {
 		return SQLITE_NOMEM;
 	}
-	memset(vfs, 0, sizeof(sqlite3_vfs));
+	memset(pVfs, 0, sizeof(sqlite3_vfs));
 
 	if (name == NULL) {
 		name = "ext";
@@ -226,56 +194,49 @@ int sqlite3_ext_vfs_register(const char *name, int makeDflt, int *pOutVfsId)
 
 	char *nameCopy = sqlite3_malloc(strlen(name) + 1);
 	if (nameCopy == NULL) {
-		sqlite3_free(vfs);
+		sqlite3_free(pVfs);
 		return SQLITE_NOMEM;
 	}
 	strcpy(nameCopy, name);
 
-	vfs->iVersion = 1;
-	vfs->szOsFile = sizeof(sqlite3_ext_file);
-	vfs->mxPathname = 256;
-	vfs->zName = nameCopy;
-	vfs->pAppData = (void *)vfsId;
-	vfs->xOpen = vfs_open;
-	vfs->xDelete = vfs_delete;
-	vfs->xAccess = vfs_access;
-	vfs->xFullPathname = vfs_full_pathname;
-	vfs->xDlOpen = vfs_dlopen;
-	vfs->xDlError = vfs_dlerror;
-	vfs->xDlSym = NULL;
-	vfs->xDlClose = NULL;
-	vfs->xRandomness = vfs_randomness;
-	vfs->xSleep = vfs_sleep;
-	vfs->xCurrentTime = vfs_current_time;
-	vfs->xGetLastError = vfs_get_last_error;
+	pVfs->iVersion = 1;
+	pVfs->szOsFile = sizeof(sqlite3_ext_file);
+	pVfs->mxPathname = 256;
+	pVfs->zName = nameCopy;
+	pVfs->pAppData = 0;
+	pVfs->xOpen = vfs_open;
+	pVfs->xDelete = vfs_delete;
+	pVfs->xAccess = vfs_access;
+	pVfs->xFullPathname = vfs_full_pathname;
+	pVfs->xDlOpen = vfs_dlopen;
+	pVfs->xDlError = vfs_dlerror;
+	pVfs->xDlSym = NULL;
+	pVfs->xDlClose = NULL;
+	pVfs->xRandomness = vfs_randomness;
+	pVfs->xSleep = vfs_sleep;
+	pVfs->xCurrentTime = vfs_current_time;
+	pVfs->xGetLastError = vfs_get_last_error;
 
-	int rc = sqlite3_vfs_register(vfs, makeDflt);
+	int rc = sqlite3_vfs_register(pVfs, makeDflt);
 
 	if (rc == SQLITE_OK)
 	{
-		*pOutVfsId = (int)vfs->pAppData;
-		ext_vfs[vfsId] = vfs;
+		*ppOutVfs = pVfs;
 		return SQLITE_OK;
 	}
 
 	sqlite3_free(nameCopy);
-	sqlite3_free(vfs);
+	sqlite3_free(pVfs);
 
 	return rc;
 }
 
-int sqlite3_ext_vfs_unregister(int vfsId)
+int sqlite3_ext_vfs_unregister(sqlite3_vfs *pVfs)
 {
-	if (ext_vfs[vfsId] == NULL)
-	{
-		return SQLITE_ERROR;
-	}
-	int rc = sqlite3_vfs_unregister(ext_vfs[vfsId]);
-	if (rc == SQLITE_OK)
-	{
-		sqlite3_free((void *)(ext_vfs[vfsId]->zName));
-		sqlite3_free(ext_vfs[vfsId]);
-		ext_vfs[vfsId] = NULL;
+	int rc = sqlite3_vfs_unregister(pVfs);
+	if (rc == SQLITE_OK) {
+		sqlite3_free((void *)(pVfs->zName));
+		sqlite3_free(pVfs);
 	}
 	return rc;
 }

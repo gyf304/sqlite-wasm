@@ -1,7 +1,10 @@
 {
   "name": "@yifangu/sqlite",
-  "version": "1.0.0-alpha.18",
-  "repository": "https://github.com/gyf304/sqlite-wasm",
+  "version": "1.0.0-alpha.21",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/gyf304/sqlite-wasm.git"
+  },
   "author": "Yifan Gu <gyf304@users.noreply.github.com>",
   "license": "MIT",
   "publishConfig": {
@@ -25,7 +28,6 @@
     "./sqlite3.wasm": "./dist/wasm/sqlite3.wasm"
   },
   "devDependencies": {
-    "@happy-dom/global-registrator": "^12.10.3",
     "@types/mocha": "^9.1.1",
     "@types/node": "^17.0.35",
     "badgen": "^3.2.2",

@@ -1,6 +1,7 @@
 import * as fs from "fs/promises";
 import { describe, expect, it, beforeAll } from "bun:test";
-import { SQLite, SQLiteResultCodes } from "./index.js";
+import { SQLite, ResultCode } from "./index.js";
+import { NodeVFS } from "./vfs/node.js";
 
 async function initModule() {
 	const wasm = await fs.readFile("./sqlite/sqlite3.wasm");
@@ -19,11 +20,6 @@ async function initDb() {
 	const sqlite = await initSQLite();
 	return sqlite.open(":memory:");
 }
-
-beforeAll(async () => {
-	// remove crypto to test fallback
-	globalThis.crypto = {} as any;
-});
 
 describe("SQLite", function () {
 	it("should support synchronous init", async function() {
@@ -112,28 +108,6 @@ describe("SQLite", function () {
 		while (stmt.step()) {
 			for (let i = 0; i < columnCount; i++) {
 				values.push(stmt.columnText(i));``
-			}
-		}
-		expect(values.length).toBe(2);
-		expect(values[0]).not.toEqual(values[1]);
-		stmt.finalize();
-		db.close();
-	});
-
-	it("should support randomness with crypto", async function() {
-		const module = await modulePromise;
-		globalThis.crypto = {
-			getRandomValues: (x: ArrayBuffer) => require("crypto").randomFillSync(x)
-		} as any;
-		const sqlite = SQLite.instantiate(module, false);
-		const db = sqlite.open(":memory:");
-		const stmt = db.prepare("SELECT RANDOM(), RANDOM()")!;
-		const columnCount = stmt.columnCount();
-		expect(columnCount).toBe(2);
-		const values: string[] = [];
-		while (stmt.step()) {
-			for (let i = 0; i < columnCount; i++) {
-				values.push(stmt.columnText(i));
 			}
 		}
 		expect(values.length).toBe(2);
@@ -359,6 +333,48 @@ describe("SQLite", function () {
 		db.close();
 	});
 
+	it("should sleep", async function() {
+		const db = await initDb();
+		db.exports.sqlite3_sleep(0);
+		db.close();
+	});
+
+	it("should be able to register and unregister vfs", async function() {
+		const sqlite = await initSQLite();
+		sqlite.registerVFS(NodeVFS);
+		sqlite.unregisterVFS(NodeVFS);
+	});
+
+	describe("NodeVFS", async function() {
+		const sqlite = await initSQLite();
+		sqlite.registerVFS(NodeVFS, true);
+		// delete file if exists
+		await fs.rm("test.db", { force: true });
+		const db = sqlite.open("test.db");
+		db.exec("CREATE TABLE test (id INTEGER PRIMARY KEY, value TEXT)");
+		it("should create file", async function() {
+			expect(await fs.stat("test.db")).toBeTruthy();
+		});
+		it("should handle insertions", function() {
+			db.exec("INSERT INTO test (value) VALUES ('hello')");
+			db.exec("INSERT INTO test (value) VALUES ('hello')");
+			db.exec("INSERT INTO test (value) VALUES ('hello')");
+			const rows = db.exec("SELECT * FROM test;");
+			expect(rows.length).toBe(3);
+		});
+		it("should handle a lot of insertions", function() {
+			for (let i = 0; i < 1000; i++) {
+				db.exec("INSERT INTO test (value) VALUES ('hello')");
+			}
+			const rows = db.exec("SELECT * FROM test;");
+			expect(rows.length).toBe(1003);
+		});
+		it("should handle vacuum", function() {
+			db.exec("DELETE FROM test;")
+			db.exec("VACUUM");
+		});
+	});
+
 	describe("Utilities", () => {
 		it("should handle noop checkError", async function() {
 			const sqlite = await initSQLite();
@@ -366,7 +382,7 @@ describe("SQLite", function () {
 		});
 		it("should handle checkError with no db", async function() {
 			const sqlite = await initSQLite();
-			expect(() => sqlite.utils.checkError(SQLiteResultCodes.SQLITE_ERROR)).toThrow();
+			expect(() => sqlite.utils.checkError(ResultCode.ERROR)).toThrow();
 		});
 	});
 });

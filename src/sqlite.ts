@@ -1,13 +1,40 @@
-import { SQLiteExports, CPointer, SQLiteImports, unimplementedImports } from "./api";
-import { SQLiteResultCodes, SQLiteDatatype, SQLiteDatatypes } from "./constants";
+import type { SQLiteExports, CPointer, SQLiteImports } from "./api";
+import { ResultCode, Datatype, SyncFlag, LockLevel, AccessFlag, OpenFlag, VERSION_NUMBER } from "./constants";
 
 import { SQLiteError, SQLiteUtils } from "./utils";
+import { VFS, VFSFile } from "./vfs/index";
+import { JSVFS } from "./vfs/js";
 
 type ScalarIn = string | number | boolean | bigint | ArrayBuffer | null;
 type ScalarOut = string | number | bigint | ArrayBuffer | null;
 
+function mustGet<T, K>(map: Map<T, K>, key: T): K {
+	const value = map.get(key);
+	if (value === undefined) {
+		throw new Error(`No value for ${key}`);
+	}
+	return value;
+}
+
+function wrapError(fn: (...args: any[]) => void): number {
+	try {
+		fn();
+		return ResultCode.OK;
+	} catch (e) {
+		if (e instanceof SQLiteError) {
+			return e.code;
+		}
+		throw e;
+	}
+}
+
 export class SQLite {
 	private readonly instance: WebAssembly.Instance;
+
+	private vfsMap: Map<number, VFS> = new Map();
+	private fileMap: Map<number, VFSFile> = new Map();
+	private fileId: number = 1;
+
 	public readonly utils: SQLiteUtils;
 	public readonly exports: SQLiteExports;
 
@@ -20,38 +47,149 @@ export class SQLite {
 		let sqlite: SQLite;
 
 		const imports: SQLiteImports = {
-			...unimplementedImports,
-			sqlite3_ext_vfs_get_last_error: () => {
-				return SQLiteResultCodes.SQLITE_OK;
+			sqlite3_ext_io_check_reserved_lock(_, fileId, pResOut) {
+				const file = mustGet(sqlite.fileMap, fileId);
+				return wrapError(() => {
+					const res = file.checkReservedLock();
+					sqlite.utils.dataView.setUint32(pResOut, res ? 1 : 0, true);
+				});
 			},
-			sqlite3_ext_vfs_full_pathname: () => {
-				return SQLiteResultCodes.SQLITE_CANTOPEN;
+			sqlite3_ext_io_close(_, fileId) {
+				const file = mustGet(sqlite.fileMap, fileId);
+				return wrapError(() => {
+					file.close();
+					sqlite.fileMap.delete(fileId);
+				});
 			},
-			sqlite3_ext_vfs_current_time: (_, pTimeOut) => {
-				const f64 = sqlite.utils.f64;
-				f64[pTimeOut / 8] = Date.now() / 86400000 + 2440587.5;
-				return SQLiteResultCodes.SQLITE_OK;
+			sqlite3_ext_io_device_characteristics(_, fileId) {
+				const file = mustGet(sqlite.fileMap, fileId);
+				return file.deviceCharacteristics();
 			},
-			sqlite3_ext_vfs_randomness: globalThis?.crypto?.getRandomValues !== undefined ? (_, nByte, zOut) => {
-				const u8 = new Uint8Array(nByte);
-				globalThis.crypto.getRandomValues(u8.slice(zOut, zOut + nByte));
-				return SQLiteResultCodes.SQLITE_OK;
-			} : (_, nByte, zOut) => {
-				const u8 = new Uint8Array(nByte);
-				for (let i = 0; i < nByte; i++) {
-					u8[zOut + i] = Math.floor(Math.random() * 256);
-				}
-				return SQLiteResultCodes.SQLITE_OK;
+			sqlite3_ext_io_file_control(_, fileId, op, pArg) {
+				const file = mustGet(sqlite.fileMap, fileId);
+				return wrapError(() => {
+					const arg = sqlite.utils.deref32(pArg);
+					const argBuf = sqlite.utils.u8.slice(arg).buffer as ArrayBuffer;
+					file.fileControl(op, argBuf);
+				});
+			},
+			sqlite3_ext_io_file_size(_, fileId, pSize) {
+				const file = mustGet(sqlite.fileMap, fileId);
+				return wrapError(() => {
+					const size = file.fileSize();
+					sqlite.utils.dataView.setBigUint64(pSize, BigInt(size), true);
+				});
+			},
+			sqlite3_ext_io_lock(_, fileId, locktype) {
+				const file = mustGet(sqlite.fileMap, fileId);
+				return wrapError(() => {
+					file.lock(locktype as LockLevel);
+				});
+			},
+			sqlite3_ext_io_read(_, fileId, pBuf, iAmt, iOfst) {
+				const file = mustGet(sqlite.fileMap, fileId);
+				return wrapError(() => {
+					const buf = sqlite.utils.u8.subarray(pBuf, pBuf + iAmt);
+					file.read(buf, iOfst);
+				});
+			},
+			sqlite3_ext_io_sector_size(_, fileId) {
+				const file = mustGet(sqlite.fileMap, fileId);
+				return file.sectorSize();
+			},
+			sqlite3_ext_io_sync(_, fileId, flags) {
+				const file = mustGet(sqlite.fileMap, fileId);
+				return wrapError(() => {
+					file.sync(flags as SyncFlag);
+				});
+			},
+			sqlite3_ext_io_unlock(_, fileId, locktype) {
+				const file = mustGet(sqlite.fileMap, fileId);
+				return wrapError(() => {
+					file.unlock(locktype as LockLevel);
+				});
+			},
+			sqlite3_ext_io_truncate(_, fileId, size) {
+				const file = mustGet(sqlite.fileMap, fileId);
+				return wrapError(() => {
+					file.truncate(Number(size));
+				});
+			},
+			sqlite3_ext_io_write(_, fileId, pBuf, iAmt, iOfst) {
+				const file = mustGet(sqlite.fileMap, fileId);
+				return wrapError(() => {
+					const buf = sqlite.utils.u8.subarray(pBuf, pBuf + iAmt);
+					file.write(buf, iOfst);
+				});
+			},
+			sqlite3_ext_vfs_access(id, zName, flags, pResOut) {
+				const vfs = mustGet(sqlite.vfsMap, id);
+				return wrapError(() => {
+					const res = vfs.access(sqlite.utils.decodeString(zName), flags as AccessFlag);
+					sqlite.utils.dataView.setUint32(pResOut, res ? 1 : 0, true);
+				});
+			},
+			sqlite3_ext_vfs_delete(id, zName, syncDir) {
+				const vfs = mustGet(sqlite.vfsMap, id);
+				return wrapError(() => {
+					vfs.delete(sqlite.utils.decodeString(zName), syncDir !== 0);
+				});
+			},
+			sqlite3_ext_vfs_open(id, zName, pOutfileId, flags, pOutFlags) {
+				const vfs = mustGet(sqlite.vfsMap, id);
+				return wrapError(() => {
+					const fileId = sqlite.fileId;
+					const file = vfs.open(sqlite.utils.decodeString(zName), flags as OpenFlag);
+					sqlite.fileMap.set(fileId, file);
+					sqlite.fileId += 1;
+					sqlite.utils.dataView.setUint32(pOutfileId, fileId, true);
+					sqlite.utils.dataView.setUint32(pOutFlags, file.openFlags, true);
+				});
+			},
+			sqlite3_ext_vfs_get_last_error: (id, nByte, zOut) => {
+				const e = mustGet(sqlite.vfsMap, id).getLastError();
+				const code = e.code;
+				return code;
+			},
+			sqlite3_ext_vfs_full_pathname: (id, zName, nOut, zOut) => {
+				const vfs = mustGet(sqlite.vfsMap, id);
+				return wrapError(() => {
+					const path = vfs.fullPathname(sqlite.utils.decodeString(zName));
+					sqlite.utils.setString(zOut, nOut, path);
+				});
+			},
+			sqlite3_ext_vfs_current_time: (id, pTimeOut) => {
+				const vfs = mustGet(sqlite.vfsMap, id);
+				return wrapError(() => {
+					const time = vfs.currentTime();
+					sqlite.utils.dataView.setFloat64(pTimeOut, time, true);
+				});
+			},
+			sqlite3_ext_vfs_randomness: (id, nByte, zOut) => {
+				const vfs = mustGet(sqlite.vfsMap, id);
+				return wrapError(() => {
+					vfs.randomness(sqlite.utils.u8.subarray(zOut, zOut + nByte));
+				});
+			},
+			sqlite3_ext_vfs_sleep: (id, microseconds) => {
+				const vfs = mustGet(sqlite.vfsMap, id);
+				return wrapError(() => {
+					vfs.sleep(microseconds);
+				});
 			},
 			sqlite3_ext_os_init: () => {
 				const pId = sqlite.utils.malloc(4);
-				const rc = sqlite.exports.sqlite3_ext_vfs_register(0, 1, pId);
+				const pName = sqlite.utils.cString(JSVFS.name);
+				const rc = sqlite.exports.sqlite3_ext_vfs_register(pName, 1, pId);
+				const id = sqlite.utils.deref32(pId);
+				sqlite.vfsMap.set(id, JSVFS);
+				sqlite.utils.free(pName);
 				sqlite.utils.free(pId);
 				sqlite.utils.checkError(rc);
-				return SQLiteResultCodes.SQLITE_OK;
+				return ResultCode.OK;
 			},
 			sqlite3_ext_os_end: () => {
-				return SQLiteResultCodes.SQLITE_OK;
+				return ResultCode.OK;
 			},
 			sqlite3_ext_exec_callback: (i, nCols, azCols, azColNames) => {
 				return sqlite._execCallback!(i, nCols, azCols, azColNames);
@@ -82,7 +220,7 @@ export class SQLite {
 		}
 	}
 
-	public constructor(instance: WebAssembly.Instance) {
+	private constructor(instance: WebAssembly.Instance) {
 		this.instance = instance;
 		this.exports = this.instance.exports as SQLiteExports;
 		this.utils = new SQLiteUtils(this.exports);
@@ -90,23 +228,48 @@ export class SQLite {
 
 	public initialize(): void {
 		const rc = this.exports.sqlite3_initialize();
+		const ver = this.exports.sqlite3_libversion_number();
+		if (ver !== VERSION_NUMBER) {
+			throw new Error(`SQLite version mismatch: expected ${VERSION_NUMBER}, got ${ver}`);
+		}
 		this.utils.checkError(rc);
 	}
 
-	public open(filename: string): SQLiteDB {
+	public registerVFS(vfs: VFS, makeDflt: boolean = false): void {
+		const pId = this.utils.malloc(4);
+		const pName = this.utils.cString(vfs.name);
+		const rc = this.exports.sqlite3_ext_vfs_register(pName, makeDflt ? 1 : 0, pId);
+		const id = this.utils.deref32(pId);
+		this.vfsMap.set(id, vfs);
+		this.utils.free(pName);
+		this.utils.free(pId);
+		this.utils.checkError(rc);
+	}
+
+	public unregisterVFS(vfs: VFS): void {
+		const ptr = Array.from(this.vfsMap.entries()).find(([_, v]) => v === vfs)?.[0];
+		if (ptr === undefined) {
+			throw new Error(`VFS ${vfs.name} not registered`);
+		}
+		const rc = this.exports.sqlite3_ext_vfs_unregister(ptr);
+		this.utils.checkError(rc);
+		this.vfsMap.delete(ptr);
+	}
+
+	public open(filename: string): Database {
 		const filenamePtr = this.utils.cString(filename);
 		const ppDb = this.exports.sqlite3_malloc(4);
 		const rc = this.exports.sqlite3_open(filenamePtr, ppDb);
 		this.utils.free(filenamePtr);
-		if (rc !== SQLiteResultCodes.SQLITE_OK) {
+		if (rc !== ResultCode.OK) {
 			throw new SQLiteError(rc);
 		}
 		const pDb = this.utils.deref32(ppDb);
 		this.utils.free(ppDb);
-		return new SQLiteDB(this, pDb);
+		return new Database(this, pDb);
 	}
 
-	public load(data: ArrayBuffer, schema: string = "main"): SQLiteDB {
+	public load(data: ArrayBuffer, schema: string = "main"): Database {
 		const db = this.open(":memory:");
 		const backupDb = this.open(":memory:");
 		const zSchema = this.utils.cString(schema);
@@ -131,12 +294,12 @@ export class SQLite {
 	}
 }
 
-export interface SQLiteExecValue {
+export interface ExecValue {
 	name: string;
 	value: string | null;
 }
 
-export class SQLiteDB {
+export class Database {
 	public readonly utils: SQLiteUtils;
 	public readonly exports: SQLiteExports;
 
@@ -145,13 +308,13 @@ export class SQLiteDB {
 		this.exports = sqlite.exports;
 	}
 
-	public prepare(sql: string): SQLiteStatement | null;
-	public prepare(sql: string, callback: (stmt: SQLiteStatement) => void): void;
-	public prepare(sql: string, callback?: (stmt: SQLiteStatement) => void): SQLiteStatement | null | void {
+	public prepare(sql: string): Statement | null;
+	public prepare(sql: string, callback: (stmt: Statement) => void): void;
+	public prepare(sql: string, callback?: (stmt: Statement) => void): Statement | null | void {
 		if (callback !== undefined) {
 			let nextSql: string = sql;
 			while (true) {
-				const stmt: SQLiteStatement | null = this.prepare(nextSql);
+				const stmt: Statement | null = this.prepare(nextSql);
 				if (stmt === null) {
 					return;
 				}
@@ -169,7 +332,7 @@ export class SQLiteDB {
 		const ppStmt = this.exports.sqlite3_malloc(4);
 		const pzTail = this.exports.sqlite3_malloc(4);
 		const rc = this.exports.sqlite3_prepare_v2(this.pDb, zSql, -1, ppStmt, pzTail);
-		if (rc !== SQLiteResultCodes.SQLITE_OK) {
+		if (rc !== ResultCode.OK) {
 			this.utils.free(zSql);
 			this.utils.free(ppStmt);
 			this.utils.free(pzTail);
@@ -188,16 +351,16 @@ export class SQLiteDB {
 		if (pStmt === 0) {
 			return null;
 		}
-		return new SQLiteStatement(this, pStmt, consumedSql, tail);
+		return new Statement(this, pStmt, consumedSql, tail);
 	}
 
-	public exec(sql: string): SQLiteExecValue[][] {
-		const results: SQLiteExecValue[][] = [];
+	public exec(sql: string): ExecValue[][] {
+		const results: ExecValue[][] = [];
 		const pSql = this.utils.cString(sql);
 		const pzErr = this.utils.malloc(4);
 
 		this.sqlite._execCallback = (i, nCols, azCols, azColNames) => {
-			const result: SQLiteExecValue[] = [];
+			const result: ExecValue[] = [];
 			results.push(result);
 			for (let i = 0; i < nCols; i++) {
 				const zCol = this.utils.deref32(azCols + i * 4);
@@ -205,7 +368,7 @@ export class SQLiteDB {
 				const colName = this.utils.decodeString(zColName);
 				result.push({ name: colName, value: zCol === 0 ? null : this.utils.decodeString(zCol) });
 			}
-			return SQLiteResultCodes.SQLITE_OK;
+			return ResultCode.OK;
 		};
 		const rc = this.exports.sqlite3_ext_exec(this.pDb, pSql, 0, pzErr);
 		this.utils.free(pSql);
@@ -252,12 +415,12 @@ export class SQLiteDB {
 	}
 }
 
-export class SQLiteStatement {
+export class Statement {
 	public readonly utils: SQLiteUtils;
 	public readonly exports: SQLiteExports;
 
 	constructor(
-		public readonly db: SQLiteDB,
+		public readonly db: Database,
 		private pStmt: CPointer,
 		public readonly sql?: string,
 		public readonly tail?: string
@@ -336,9 +499,9 @@ export class SQLiteStatement {
 
 	public step(): boolean {
 		const rc = this.exports.sqlite3_step(this.pStmt);
-		if (rc === SQLiteResultCodes.SQLITE_ROW) {
+		if (rc === ResultCode.ROW) {
 			return true;
-		} else if (rc === SQLiteResultCodes.SQLITE_OK || rc === SQLiteResultCodes.SQLITE_DONE) {
+		} else if (rc === ResultCode.OK || rc === ResultCode.DONE) {
 			return false;
 		} else {
 			throw this.utils.lastError(this.db.pDb);
@@ -350,8 +513,8 @@ export class SQLiteStatement {
 		this.utils.checkError(rc, this.db.pDb);
 	}
 
-	public columnType(i: number): SQLiteDatatype {
-		return this.exports.sqlite3_column_type(this.pStmt, i) as SQLiteDatatype;
+	public columnType(i: number): Datatype {
+		return this.exports.sqlite3_column_type(this.pStmt, i) as Datatype;
 	}
 
 	public columnName(i: number): string {
@@ -402,18 +565,18 @@ export class SQLiteStatement {
 	public columnValue(i: number, noBigInt?: boolean): ScalarOut {
 		const type = this.columnType(i);
 		switch (type) {
-			case SQLiteDatatypes.SQLITE_NULL:
+			case Datatype.NULL:
 				return null;
-			case SQLiteDatatypes.SQLITE_TEXT:
+			case Datatype.TEXT:
 				return this.columnText(i);
-			case SQLiteDatatypes.SQLITE_BLOB:
+			case Datatype.BLOB:
 				return this.columnBlob(i);
-			case SQLiteDatatypes.SQLITE_INTEGER:
+			case Datatype.INTEGER:
 				if (noBigInt || globalThis.BigInt === undefined) {
 					return this.columnInt(i);
 				}
 				return this.columnInt64(i);
-			case SQLiteDatatypes.SQLITE_FLOAT:
+			case Datatype.FLOAT:
 				return this.columnDouble(i);
 			default:
 				/* istanbul ignore next - should not happen, all types covered */
