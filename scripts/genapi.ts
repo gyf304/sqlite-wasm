@@ -102,6 +102,9 @@ function getArgName(s: string) {
 }
 
 function splitArgs(s: string) {
+	if (s.trim() === "") {
+		return [];
+	}
 	const args: string[] = [];
 	let tmp = "";
 	let paren = 0;
@@ -137,7 +140,7 @@ interface SqliteApiInfo {
 }
 
 function extractApis(header: string): SqliteApiInfo[] {
-	const apis = stripComments(header).matchAll(/^(SQLITE_API|SQLITE_EXTRA_API|SQLITE_IMPORTED_API) ([^]*?)([^ *()]+)\(([^]*?)\);/mg);
+	const apis = stripComments(header).matchAll(/^(SQLITE_API|SQLITE_EXTRA_API|SQLITE_IMPORTED_API) ([^=]*?)([^ *()]+)\(([^=]*?)\)[ \r\n]*[;\{]/mg);
 	const apiInfos: SqliteApiInfo[] = [];
 	for (const api of apis) {
 		if (api[0].includes("SQLITE_DEPRECATED")) {
@@ -178,9 +181,12 @@ function genPlaceholder(api: SqliteApiInfo) {
 async function main() {
 	const sqliteHeaderFilename = "./sqlite/sqlite3.h";
 	const sqliteWasmHeaderFilename = "./sqlite/sqlite3wasm.h";
+	const sqliteExtraFilename = "./sqlite/sqlite3extra.c";
 	const sqliteHeader = await fs.readFile(sqliteHeaderFilename, { encoding: "ascii" });
 	const sqliteWasmHeader = await fs.readFile(sqliteWasmHeaderFilename, { encoding: "ascii" });
-	const apis = extractApis(sqliteHeader);
+	const sqliteExtra = await fs.readFile(sqliteExtraFilename, { encoding: "ascii" });
+
+	const apis = extractApis(sqliteHeader).concat(extractApis(sqliteExtra));
 	const wasmApis = extractApis(sqliteWasmHeader);
 
 	const exportApis = apis.concat(wasmApis).filter((api) => api.apiType === "SQLITE_API" || api.apiType === "SQLITE_EXTRA_API");

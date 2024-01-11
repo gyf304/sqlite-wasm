@@ -1,6 +1,6 @@
 {
   "name": "@yifangu/sqlite",
-  "version": "1.0.0-alpha.21",
+  "version": "1.0.0-alpha.23",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/gyf304/sqlite-wasm.git"
@@ -24,7 +24,26 @@
       "import": "./dist/index.mjs",
       "types": "./dist/index.d.ts"
     },
-    "./dist/wasm/sqlite3.wasm": "./dist/wasm/sqlite3.wasm",
+    "./vfs/node.js": {
+      "require": "./dist/cjs/vfs/node.js",
+      "import": "./dist/esm/vfs/node.js",
+      "types": "./dist/esm/vfs/node.d.ts"
+    },
+    "./vfs/node": {
+      "require": "./dist/cjs/vfs/node.js",
+      "import": "./dist/esm/vfs/node.js",
+      "types": "./dist/esm/vfs/node.d.ts"
+    },
+    "./vfs/xhr.js": {
+      "require": "./dist/cjs/vfs/xhr.js",
+      "import": "./dist/esm/vfs/xhr.js",
+      "types": "./dist/esm/vfs/xhr.d.ts"
+    },
+    "./vfs/xhr": {
+      "require": "./dist/cjs/vfs/xhr.js",
+      "import": "./dist/esm/vfs/xhr.js",
+      "types": "./dist/esm/vfs/xhr.d.ts"
+    },
     "./sqlite3.wasm": "./dist/wasm/sqlite3.wasm"
   },
   "devDependencies": {
@@ -33,13 +52,13 @@
     "badgen": "^3.2.2",
     "bun-types": "latest",
     "happy-dom": "^12.10.3",
-    "typescript": "^4.6.4"
+    "typescript": "^5.3.3"
   },
   "scripts": {
-    "compile": "make && rm -rf dist/cjs dist/esm dist/wasm && mkdir -p dist/wasm && cp sqlite/sqlite3.wasm dist/wasm/sqlite3.wasm && tsc -p ./tsconfig.dist.cjs.json && tsc -p ./tsconfig.dist.esm.json",
-    "tsr": "node --loader ts-node/esm",
+    "compile": "(cd sqlite && make) && rm -rf dist/cjs dist/esm dist/wasm && mkdir -p dist/wasm && cp sqlite/sqlite3.wasm dist/wasm/sqlite3.wasm && tsc -p ./tsconfig.dist.cjs.json && tsc -p ./tsconfig.dist.esm.json",
+    "repl": "bun run scripts/repl.ts",
     "docs": "typedoc --out docs src/index.ts",
-    "prepack": "bun test && bun compile && bun badgen",
+    "prepack": "bun compile && bun test && bun badgen",
     "badgen": "bun run ./scripts/badgen.ts",
     "npm": "npm"
   }

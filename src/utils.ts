@@ -2,9 +2,14 @@ import type { SQLiteExports, CString } from "./api";
 import { ExtendedResultCode, ResultCode } from "./constants";
 
 export class SQLiteError extends Error {
+	public readonly parsedCode?: string;
+	public readonly rawMessage?: string;
+
 	constructor(public readonly code: number, message?: string) {
-		const parsedCode = ResultCode[code as ResultCode] ?? ExtendedResultCode[code as ExtendedResultCode] ?? "Unknown error";
-		super(`SQLite error ${code}: ${parsedCode}${message !== undefined ? `: ${message}` : ""}`);
+		const parsedCode = ResultCode[code as ResultCode] ?? ExtendedResultCode[code as ExtendedResultCode] ?? undefined;
+		super(message ?? parsedCode);
+		this.parsedCode = parsedCode;
+		this.rawMessage = message;
 	}
 }
 
@@ -33,6 +38,15 @@ export class SQLiteUtils {
 		return this.exports.sqlite3_malloc(size);
 	}
 
+	public calloc(size: number): number {
+		const ptr = this.malloc(size);
+		if (ptr === 0) {
+			return 0;
+		}
+		this.u8.fill(0, ptr, ptr + size);
+		return ptr;
+	}
+
 	public free(ptr: number): void {
 		this.exports.sqlite3_free(ptr);
 	}
@@ -52,9 +66,6 @@ export class SQLiteUtils {
 	public setString(ptr: number, nBytes: number, s: string): void {
 		const view = this.u8;
 		const buf = this.textEncoder.encode(s);
-		if (buf.length > nBytes) {
-			throw new SQLiteError(ResultCode.TOOBIG);
-		}
 		view.set(buf, ptr);
 		view[ptr + buf.length] = 0;
 	}

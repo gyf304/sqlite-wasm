@@ -4,6 +4,9 @@ import { AccessFlag, ExtendedResultCode, LockLevel, OpenFlag, ResultCode } from 
 import { SQLiteError } from "../utils.js";
 import type { VFS, VFSFile } from "./index.js";
 import { JSVFS } from "./js.js";
+import * as constants from "../constants.js";
+
+const xhrExistCache = new Map<string, boolean>();
 
 class XHRVFSFile implements VFSFile {
 	private cachedSize: number | undefined;
@@ -12,9 +15,9 @@ class XHRVFSFile implements VFSFile {
 	read(buffer: Uint8Array, offset: bigint): void {
 		buffer.fill(0);
 		const xhr = new XMLHttpRequest();
+		xhr.open("GET", this.url, false);
 		xhr.responseType = "arraybuffer";
 		xhr.setRequestHeader("Range", `bytes=${offset}-${offset + BigInt(buffer.byteLength) - 1n}`);
-		xhr.open("GET", this.url, false);
 		xhr.send();
 		if (xhr.status !== 206) {
 			throw new SQLiteError(ExtendedResultCode.IOERR_READ);
@@ -89,8 +92,17 @@ export const XHRVFS: VFS = {
 	...JSVFS,
 	name: "xhr",
 	open(path, flags) {
+		const supportedFlags = 0
+			| constants.OPEN_READONLY
+			| constants.OPEN_MAIN_DB
+			| constants.OPEN_URI
+			;
+		if ((flags & supportedFlags) !== flags) {
+			throw new SQLiteError(ResultCode.IOERR);
+		}
 		const url = new URL(path, location.href);
-		return new XHRVFSFile(url.href, OpenFlag.READONLY);
+		url.search = "";
+		return new XHRVFSFile(url.href, flags);
 	},
 	fullPathname(p) {
 		return p;
@@ -99,23 +111,31 @@ export const XHRVFS: VFS = {
 		crypto.getRandomValues(buffer);
 	},
 	access(path, flags) {
+		const url = new URL(path, location.href);
+		const mode = url.searchParams.get("mode");
+		if (mode !== null && mode !== "ro") {
+			return false;
+		}
+		url.search = "";
+		path = url.href;
+
+		let result = false;
 		switch (flags) {
 			case AccessFlag.READ:
 			case AccessFlag.EXISTS:
-				const xhr = new XMLHttpRequest();
-				xhr.open("HEAD", path, false);
-				xhr.send();
-				if (xhr.status !== 200) {
-					return false;
+				if (xhrExistCache.has(path)) {
+					result = xhrExistCache.get(path)!;
+				} else {
+					const xhr = new XMLHttpRequest();
+					xhr.open("HEAD", path, false);
+					xhr.send();
+					result = xhr.status === 200;
+					xhrExistCache.set(path, result);
 				}
-				return xhr.getResponseHeader("Accept-Ranges") === "bytes";
-			case AccessFlag.READWRITE:
-				return false;
-			default:
-				return false;
 		}
+		return result;
 	},
-	delete(path, syncDir) {
+	delete() {
 		throw new SQLiteError(ResultCode.IOERR);
 	}
 }

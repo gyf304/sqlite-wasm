@@ -80,8 +80,16 @@ export const NodeVFS: VFS = {
 	...JSVFS,
 	name: "node",
 	open(path, flags) {
-		const f = fs.openSync(path, constants.O_CREAT | constants.O_RDWR); // TODO: flags
-		fs.fsyncSync(f);
+		let ff = 0;
+		if (flags & OpenFlag.READONLY) {
+			ff |= constants.O_RDONLY;
+		} else if (flags & OpenFlag.READWRITE) {
+			ff |= constants.O_RDWR;
+		}
+		if (flags & OpenFlag.CREATE) {
+			ff |= constants.O_CREAT;
+		}
+		const f = fs.openSync(path, ff);
 		return new NodeVFSFile(f, flags);
 	},
 	fullPathname(p) {

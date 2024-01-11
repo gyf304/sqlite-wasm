@@ -1,6 +1,7 @@
 import type { SQLiteExports, CPointer, SQLiteImports } from "./api";
 import { ResultCode, Datatype, SyncFlag, LockLevel, AccessFlag, OpenFlag, VERSION_NUMBER } from "./constants";
 
+import * as constants from "./constants";
 import { SQLiteError, SQLiteUtils } from "./utils";
 import { VFS, VFSFile } from "./vfs/index";
 import { JSVFS } from "./vfs/js";
@@ -16,13 +17,15 @@ function mustGet<T, K>(map: Map<T, K>, key: T): K {
 	return value;
 }
 
-function wrapError(fn: (...args: any[]) => void): number {
+const sqliteOK = new SQLiteError(ResultCode.OK);
+
+function wrapError(fn: (...args: any[]) => void): SQLiteError {
 	try {
 		fn();
-		return ResultCode.OK;
+		return sqliteOK;
 	} catch (e) {
 		if (e instanceof SQLiteError) {
-			return e.code;
+			return e;
 		}
 		throw e;
 	}
@@ -32,13 +35,18 @@ export class SQLite {
 	private readonly instance: WebAssembly.Instance;
 
 	private vfsMap: Map<number, VFS> = new Map();
+	private vfsLastErrorMap: Map<number, SQLiteError> = new Map();
+
 	private fileMap: Map<number, VFSFile> = new Map();
 	private fileId: number = 1;
+	private _readCounter: number = 0;
+	private _writeCounter: number = 0;
 
 	public readonly utils: SQLiteUtils;
 	public readonly exports: SQLiteExports;
 
-	public _execCallback: SQLiteImports["sqlite3_ext_exec_callback"] | undefined;
+	/** @internal */
+	public _execCallback: SQLiteImports["sqlite3_wasm_exec_callback"] | undefined;
 
 	public static instantiate(module: WebAssembly.Module): Promise<SQLite>;
 	public static instantiate(module: WebAssembly.Module, async: true): Promise<SQLite>;
@@ -47,95 +55,97 @@ export class SQLite {
 		let sqlite: SQLite;
 
 		const imports: SQLiteImports = {
-			sqlite3_ext_io_check_reserved_lock(_, fileId, pResOut) {
+			sqlite3_wasm_io_check_reserved_lock(_, fileId, pResOut) {
 				const file = mustGet(sqlite.fileMap, fileId);
 				return wrapError(() => {
 					const res = file.checkReservedLock();
 					sqlite.utils.dataView.setUint32(pResOut, res ? 1 : 0, true);
-				});
+				}).code;
 			},
-			sqlite3_ext_io_close(_, fileId) {
+			sqlite3_wasm_io_close(_, fileId) {
 				const file = mustGet(sqlite.fileMap, fileId);
 				return wrapError(() => {
 					file.close();
 					sqlite.fileMap.delete(fileId);
-				});
+				}).code;
 			},
-			sqlite3_ext_io_device_characteristics(_, fileId) {
+			sqlite3_wasm_io_device_characteristics(_, fileId) {
 				const file = mustGet(sqlite.fileMap, fileId);
 				return file.deviceCharacteristics();
 			},
-			sqlite3_ext_io_file_control(_, fileId, op, pArg) {
+			sqlite3_wasm_io_file_control(_, fileId, op, pArg) {
 				const file = mustGet(sqlite.fileMap, fileId);
 				return wrapError(() => {
 					const arg = sqlite.utils.deref32(pArg);
 					const argBuf = sqlite.utils.u8.slice(arg).buffer as ArrayBuffer;
 					file.fileControl(op, argBuf);
-				});
+				}).code;
 			},
-			sqlite3_ext_io_file_size(_, fileId, pSize) {
+			sqlite3_wasm_io_file_size(_, fileId, pSize) {
 				const file = mustGet(sqlite.fileMap, fileId);
 				return wrapError(() => {
 					const size = file.fileSize();
 					sqlite.utils.dataView.setBigUint64(pSize, BigInt(size), true);
-				});
+				}).code;
 			},
-			sqlite3_ext_io_lock(_, fileId, locktype) {
+			sqlite3_wasm_io_lock(_, fileId, locktype) {
 				const file = mustGet(sqlite.fileMap, fileId);
 				return wrapError(() => {
 					file.lock(locktype as LockLevel);
-				});
+				}).code;
 			},
-			sqlite3_ext_io_read(_, fileId, pBuf, iAmt, iOfst) {
+			sqlite3_wasm_io_read(_, fileId, pBuf, iAmt, iOfst) {
+				sqlite._readCounter += 1;
 				const file = mustGet(sqlite.fileMap, fileId);
 				return wrapError(() => {
 					const buf = sqlite.utils.u8.subarray(pBuf, pBuf + iAmt);
 					file.read(buf, iOfst);
-				});
+				}).code;
 			},
-			sqlite3_ext_io_sector_size(_, fileId) {
+			sqlite3_wasm_io_sector_size(_, fileId) {
 				const file = mustGet(sqlite.fileMap, fileId);
 				return file.sectorSize();
 			},
-			sqlite3_ext_io_sync(_, fileId, flags) {
+			sqlite3_wasm_io_sync(_, fileId, flags) {
 				const file = mustGet(sqlite.fileMap, fileId);
 				return wrapError(() => {
 					file.sync(flags as SyncFlag);
-				});
+				}).code;
 			},
-			sqlite3_ext_io_unlock(_, fileId, locktype) {
+			sqlite3_wasm_io_unlock(_, fileId, locktype) {
 				const file = mustGet(sqlite.fileMap, fileId);
 				return wrapError(() => {
 					file.unlock(locktype as LockLevel);
-				});
+				}).code;
 			},
-			sqlite3_ext_io_truncate(_, fileId, size) {
+			sqlite3_wasm_io_truncate(_, fileId, size) {
 				const file = mustGet(sqlite.fileMap, fileId);
 				return wrapError(() => {
 					file.truncate(Number(size));
-				});
+				}).code;
 			},
-			sqlite3_ext_io_write(_, fileId, pBuf, iAmt, iOfst) {
+			sqlite3_wasm_io_write(_, fileId, pBuf, iAmt, iOfst) {
+				sqlite._writeCounter += 1;
 				const file = mustGet(sqlite.fileMap, fileId);
 				return wrapError(() => {
 					const buf = sqlite.utils.u8.subarray(pBuf, pBuf + iAmt);
 					file.write(buf, iOfst);
-				});
+				}).code;
 			},
-			sqlite3_ext_vfs_access(id, zName, flags, pResOut) {
+			sqlite3_wasm_vfs_access(id, zName, flags, pResOut) {
 				const vfs = mustGet(sqlite.vfsMap, id);
 				return wrapError(() => {
 					const res = vfs.access(sqlite.utils.decodeString(zName), flags as AccessFlag);
 					sqlite.utils.dataView.setUint32(pResOut, res ? 1 : 0, true);
-				});
+				}).code;
 			},
-			sqlite3_ext_vfs_delete(id, zName, syncDir) {
+			sqlite3_wasm_vfs_delete(id, zName, syncDir) {
 				const vfs = mustGet(sqlite.vfsMap, id);
 				return wrapError(() => {
 					vfs.delete(sqlite.utils.decodeString(zName), syncDir !== 0);
-				});
+				}).code;
 			},
-			sqlite3_ext_vfs_open(id, zName, pOutfileId, flags, pOutFlags) {
+			sqlite3_wasm_vfs_open(id, zName, pOutfileId, flags, pOutFlags) {
 				const vfs = mustGet(sqlite.vfsMap, id);
 				return wrapError(() => {
 					const fileId = sqlite.fileId;
@@ -144,43 +154,44 @@ export class SQLite {
 					sqlite.fileId += 1;
 					sqlite.utils.dataView.setUint32(pOutfileId, fileId, true);
 					sqlite.utils.dataView.setUint32(pOutFlags, file.openFlags, true);
-				});
+				}).code;
 			},
-			sqlite3_ext_vfs_get_last_error: (id, nByte, zOut) => {
-				const e = mustGet(sqlite.vfsMap, id).getLastError();
+			sqlite3_wasm_vfs_get_last_error: (id, nByte, zOut) => {
+				const e = sqlite.vfsLastErrorMap.get(id) ?? sqliteOK;
 				const code = e.code;
+				sqlite.utils.setString(zOut, nByte, e.message);
 				return code;
 			},
-			sqlite3_ext_vfs_full_pathname: (id, zName, nOut, zOut) => {
+			sqlite3_wasm_vfs_full_pathname: (id, zName, nOut, zOut) => {
 				const vfs = mustGet(sqlite.vfsMap, id);
 				return wrapError(() => {
 					const path = vfs.fullPathname(sqlite.utils.decodeString(zName));
 					sqlite.utils.setString(zOut, nOut, path);
-				});
+				}).code;
 			},
-			sqlite3_ext_vfs_current_time: (id, pTimeOut) => {
+			sqlite3_wasm_vfs_current_time: (id, pTimeOut) => {
 				const vfs = mustGet(sqlite.vfsMap, id);
 				return wrapError(() => {
 					const time = vfs.currentTime();
 					sqlite.utils.dataView.setFloat64(pTimeOut, time, true);
-				});
+				}).code;
 			},
-			sqlite3_ext_vfs_randomness: (id, nByte, zOut) => {
+			sqlite3_wasm_vfs_randomness: (id, nByte, zOut) => {
 				const vfs = mustGet(sqlite.vfsMap, id);
 				return wrapError(() => {
 					vfs.randomness(sqlite.utils.u8.subarray(zOut, zOut + nByte));
-				});
+				}).code;
 			},
-			sqlite3_ext_vfs_sleep: (id, microseconds) => {
+			sqlite3_wasm_vfs_sleep: (id, microseconds) => {
 				const vfs = mustGet(sqlite.vfsMap, id);
 				return wrapError(() => {
 					vfs.sleep(microseconds);
-				});
+				}).code;
 			},
-			sqlite3_ext_os_init: () => {
+			sqlite3_wasm_os_init: () => {
 				const pId = sqlite.utils.malloc(4);
 				const pName = sqlite.utils.cString(JSVFS.name);
-				const rc = sqlite.exports.sqlite3_ext_vfs_register(pName, 1, pId);
+				const rc = sqlite.exports.sqlite3_wasm_vfs_register(pName, 1, pId);
 				const id = sqlite.utils.deref32(pId);
 				sqlite.vfsMap.set(id, JSVFS);
 				sqlite.utils.free(pName);
@@ -188,10 +199,10 @@ export class SQLite {
 				sqlite.utils.checkError(rc);
 				return ResultCode.OK;
 			},
-			sqlite3_ext_os_end: () => {
+			sqlite3_wasm_os_end: () => {
 				return ResultCode.OK;
 			},
-			sqlite3_ext_exec_callback: (i, nCols, azCols, azColNames) => {
+			sqlite3_wasm_exec_callback: (i, nCols, azCols, azColNames) => {
 				return sqlite._execCallback!(i, nCols, azCols, azColNames);
 			},
 		};
@@ -238,7 +249,7 @@ export class SQLite {
 	public registerVFS(vfs: VFS, makeDflt: boolean = false): void {
 		const pId = this.utils.malloc(4);
 		const pName = this.utils.cString(vfs.name);
-		const rc = this.exports.sqlite3_ext_vfs_register(pName, makeDflt ? 1 : 0, pId);
+		const rc = this.exports.sqlite3_wasm_vfs_register(pName, makeDflt ? 1 : 0, pId);
 		const id = this.utils.deref32(pId);
 		this.vfsMap.set(id, vfs);
 		this.utils.free(pName);
@@ -251,15 +262,32 @@ export class SQLite {
 		if (ptr === undefined) {
 			throw new Error(`VFS ${vfs.name} not registered`);
 		}
-		const rc = this.exports.sqlite3_ext_vfs_unregister(ptr);
+		const rc = this.exports.sqlite3_wasm_vfs_unregister(ptr);
 		this.utils.checkError(rc);
 		this.vfsMap.delete(ptr);
 	}
 
-	public open(filename: string): Database {
+	public get readCounter(): number {
+		return this._readCounter;
+	}
+
+	public get writeCounter(): number {
+		return this._writeCounter;
+	}
+
+	public open(filename: string, flags?: number, vfs?: string): Database {
 		const filenamePtr = this.utils.cString(filename);
 		const ppDb = this.exports.sqlite3_malloc(4);
-		const rc = this.exports.sqlite3_open(filenamePtr, ppDb);
+		let rc = 0;
+		if (flags === undefined) {
+			rc = this.exports.sqlite3_open(filenamePtr, ppDb);
+		} else {
+			const vfsCStr = vfs === undefined ? 0 : this.utils.cString(vfs);
+			rc = this.exports.sqlite3_open_v2(filenamePtr, ppDb, flags, vfsCStr);
+			if (vfsCStr !== 0) {
+				this.utils.free(vfsCStr);
+			}
+		}
 		this.utils.free(filenamePtr);
 		if (rc !== ResultCode.OK) {
 			throw new SQLiteError(rc);
@@ -299,6 +327,15 @@ export interface ExecValue {
 	value: string | null;
 }
 
+const dbFR = new FinalizationRegistry((w: {
+	sqlite: SQLite;
+	pDb: number;
+}) => {
+	if (w.pDb !== 0) {
+		w.sqlite.exports.sqlite3_close(w.pDb);
+	}
+});
+
 export class Database {
 	public readonly utils: SQLiteUtils;
 	public readonly exports: SQLiteExports;
@@ -306,28 +343,53 @@ export class Database {
 	constructor(public readonly sqlite: SQLite, public pDb: CPointer) {
 		this.utils = sqlite.utils;
 		this.exports = sqlite.exports;
+		dbFR.register(this, { sqlite, pDb }, this);
 	}
 
-	public prepare(sql: string): Statement | null;
-	public prepare(sql: string, callback: (stmt: Statement) => void): void;
-	public prepare(sql: string, callback?: (stmt: Statement) => void): Statement | null | void {
-		if (callback !== undefined) {
-			let nextSql: string = sql;
-			while (true) {
-				const stmt: Statement | null = this.prepare(nextSql);
-				if (stmt === null) {
-					return;
+	public loadExtension(module: WebAssembly.Module, symbol?: string): void {
+		const apis = this.exports.sqlite3_get_api_routines();
+		const exports = WebAssembly.Module.exports(module);
+		const exportedSymbols = new Set(exports.map((x) => x.name));
+		let initSymbol: string | undefined = symbol;
+
+		if (initSymbol === undefined) {
+			for (const symbol of exportedSymbols) {
+				if (symbol.match(/^sqlite3_[a-zA-Z]+_init$/)) {
+					initSymbol = symbol;
+					break;
 				}
-				try {
-					callback(stmt);
-				} catch (e) {
-					stmt.finalize();
-					throw e;
-				}
-				stmt.finalize();
-				nextSql = stmt.tail ?? "";
 			}
+			if (initSymbol === undefined) {
+				throw new Error(`Could not find initialization function`);
+			}
+		} else if (!exportedSymbols.has(initSymbol)) {
+			throw new Error(`Symbol ${initSymbol} not found`);
 		}
+
+		const instance = new WebAssembly.Instance(module, {
+			env: {
+				memory: this.exports.memory,
+				__indirect_function_table: this.exports.__indirect_function_table,
+			},
+		});
+
+		const xInit: (db: CPointer, pzErrMsg: CPointer, pApi: CPointer) => ResultCode =
+			instance.exports[initSymbol] as unknown as any;
+		const pzErrMsg = this.utils.calloc(4);
+		const rc = xInit(this.pDb, pzErrMsg, apis);
+		if (rc !== ResultCode.OK) {
+			const zErrMsg = this.utils.deref32(pzErrMsg);
+			let errMsg: string | undefined;
+			if (zErrMsg !== 0) {
+				errMsg = this.utils.decodeString(zErrMsg);
+			}
+			this.utils.free(pzErrMsg);
+			throw new SQLiteError(rc, errMsg);
+		}
+		this.utils.free(pzErrMsg);
+	}
+
+	public prepare(sql: string): Statement | null {
 		const zSql = this.utils.cString(sql);
 		const ppStmt = this.exports.sqlite3_malloc(4);
 		const pzTail = this.exports.sqlite3_malloc(4);
@@ -370,7 +432,7 @@ export class Database {
 			}
 			return ResultCode.OK;
 		};
-		const rc = this.exports.sqlite3_ext_exec(this.pDb, pSql, 0, pzErr);
+		const rc = this.exports.sqlite3_wasm_exec(this.pDb, pSql, 0, pzErr);
 		this.utils.free(pSql);
 		this.utils.free(pzErr);
 		this.utils.checkError(rc, this.pDb);
@@ -403,7 +465,7 @@ export class Database {
 			pData,
 			BigInt(data.byteLength),
 			BigInt(data.byteLength),
-			mFlags | 1 | 2, // add the FREEONCLOSE and RESIZABLE flag
+			mFlags | constants.DESERIALIZE_FREEONCLOSE | constants.DESERIALIZE_RESIZEABLE,
 		);
 		this.utils.free(zSchema);
 		this.utils.checkError(rc, this.pDb);
@@ -412,8 +474,19 @@ export class Database {
 	public close(): void {
 		const rc = this.exports.sqlite3_close(this.pDb);
 		this.utils.checkError(rc);
+		this.pDb = 0;
+		dbFR.unregister(this);
 	}
 }
+
+const stmtFinalizationRegistry = new FinalizationRegistry((w: {
+	db: Database;
+	pStmt: number;
+}) => {
+	if (w.pStmt !== 0) {
+		w.db.exports.sqlite3_finalize(w.pStmt);
+	}
+});
 
 export class Statement {
 	public readonly utils: SQLiteUtils;
@@ -427,6 +500,7 @@ export class Statement {
 	) {
 		this.utils = db.utils;
 		this.exports = db.exports;
+		stmtFinalizationRegistry.register(this, { db, pStmt }, this);
 	}
 
 	public columnCount(): number {
@@ -491,7 +565,7 @@ export class Statement {
 		throw new Error(`Unsupported type ${typeof value}: ${value}`);
 	}
 
-	public bindValues(values: ScalarIn[]): void {
+	public bindValues(...values: ScalarIn[]): void {
 		for (let i = 0; i < values.length; i++) {
 			this.bindValue(i + 1, values[i]);
 		}
@@ -601,5 +675,23 @@ export class Statement {
 		const rc = this.exports.sqlite3_finalize(this.pStmt);
 		this.utils.checkError(rc, this.db.pDb);
 		this.pStmt = 0;
+		stmtFinalizationRegistry.unregister(this);
+	}
+
+	public next(): IteratorResult<ScalarOut[]> {
+		if (!this.step()) {
+			return { done: true, value: [] };
+		}
+		return { done: false, value: this.columns() };
+	}
+
+	public [Symbol.iterator](): IterableIterator<ScalarOut[]> {
+		return this;
+	}
+
+	public *exec(...values: ScalarIn[]): IterableIterator<ScalarOut[]> {
+		this.reset();
+		this.bindValues(...values);
+		return this;
 	}
 }

@@ -322,37 +322,40 @@ export interface SQLiteExports extends WebAssembly.Exports {
 	sqlite3changegroup_output_strm: (a: CPointer, xOutput: CFunctionPointer, pOut: CPointer) => CInteger;
 	sqlite3rebaser_rebase_strm: (pRebaser: CPointer, xInput: CFunctionPointer, pIn: CPointer, xOutput: CFunctionPointer, pOut: CPointer) => CInteger;
 	sqlite3session_config: (op: CInteger, pArg: CPointer) => CInteger;
-	sqlite3_ext_vfs_register: (name: CString, makeDflt: CInteger, c: CPointer) => CInteger;
-	sqlite3_ext_vfs_unregister: (pVfs: CPointer) => CInteger;
-	sqlite3_ext_exec: (db: CPointer, sql: CString, id: CInteger, d: CPointer) => CInteger;
+	sqlite3_dummy: () => void;
+	sqlite3_get_api_routines: () => CPointer;
+	sqlite3_get_free: () => CPointer;
+	sqlite3_wasm_vfs_register: (name: CString, makeDflt: CInteger, c: CPointer) => CInteger;
+	sqlite3_wasm_vfs_unregister: (pVfs: CPointer) => CInteger;
+	sqlite3_wasm_exec: (db: CPointer, sql: CString, id: CInteger, d: CPointer) => CInteger;
 
 	memory: WebAssembly.Memory;
 }
 
 export interface SQLiteImports {
-	sqlite3_ext_os_init: () => CInteger;
-	sqlite3_ext_os_end: () => CInteger;
-	sqlite3_ext_exec_callback: (id: CInteger, nCols: CInteger, azCols: CPointer, azColNames: CPointer) => CInteger;
-	sqlite3_ext_io_close: (pVfs: CPointer, fileId: CInteger) => CInteger;
-	sqlite3_ext_io_read: (pVfs: CPointer, fileId: CInteger, pBuf: CPointer, iAmt: CInteger, iOfst: CInteger64) => CInteger;
-	sqlite3_ext_io_write: (pVfs: CPointer, fileId: CInteger, pBuf: CPointer, iAmt: CInteger, iOfst: CInteger64) => CInteger;
-	sqlite3_ext_io_truncate: (pVfs: CPointer, fileId: CInteger, size: CInteger64) => CInteger;
-	sqlite3_ext_io_sync: (pVfs: CPointer, fileId: CInteger, flags: CInteger) => CInteger;
-	sqlite3_ext_io_file_size: (pVfs: CPointer, fileId: CInteger, pSize: CPointer) => CInteger;
-	sqlite3_ext_io_lock: (pVfs: CPointer, fileId: CInteger, locktype: CInteger) => CInteger;
-	sqlite3_ext_io_unlock: (pVfs: CPointer, fileId: CInteger, locktype: CInteger) => CInteger;
-	sqlite3_ext_io_check_reserved_lock: (pVfs: CPointer, fileId: CInteger, pResOut: CPointer) => CInteger;
-	sqlite3_ext_io_file_control: (pVfs: CPointer, fileId: CInteger, op: CInteger, pArg: CPointer) => CInteger;
-	sqlite3_ext_io_sector_size: (pVfs: CPointer, fileId: CInteger) => CInteger;
-	sqlite3_ext_io_device_characteristics: (pVfs: CPointer, fileId: CInteger) => CInteger;
-	sqlite3_ext_vfs_open: (pVfs: CPointer, zName: CString, pOutfileId: CPointer, flags: CInteger, pOutFlags: CPointer) => CInteger;
-	sqlite3_ext_vfs_delete: (pVfs: CPointer, zName: CString, syncDir: CInteger) => CInteger;
-	sqlite3_ext_vfs_access: (pVfs: CPointer, zName: CString, flags: CInteger, pResOut: CPointer) => CInteger;
-	sqlite3_ext_vfs_full_pathname: (pVfs: CPointer, zName: CString, nOut: CInteger, zOut: CPointer) => CInteger;
-	sqlite3_ext_vfs_randomness: (pVfs: CPointer, nByte: CInteger, zOut: CPointer) => CInteger;
-	sqlite3_ext_vfs_sleep: (pVfs: CPointer, microseconds: CInteger) => CInteger;
-	sqlite3_ext_vfs_current_time: (pVfs: CPointer, pTimeOut: CPointer) => CInteger;
-	sqlite3_ext_vfs_get_last_error: (pVfs: CPointer, nByte: CInteger, zOut: CPointer) => CInteger;
+	sqlite3_wasm_os_init: () => CInteger;
+	sqlite3_wasm_os_end: () => CInteger;
+	sqlite3_wasm_exec_callback: (id: CInteger, nCols: CInteger, azCols: CPointer, azColNames: CPointer) => CInteger;
+	sqlite3_wasm_io_close: (pVfs: CPointer, fileId: CInteger) => CInteger;
+	sqlite3_wasm_io_read: (pVfs: CPointer, fileId: CInteger, pBuf: CPointer, iAmt: CInteger, iOfst: CInteger64) => CInteger;
+	sqlite3_wasm_io_write: (pVfs: CPointer, fileId: CInteger, pBuf: CPointer, iAmt: CInteger, iOfst: CInteger64) => CInteger;
+	sqlite3_wasm_io_truncate: (pVfs: CPointer, fileId: CInteger, size: CInteger64) => CInteger;
+	sqlite3_wasm_io_sync: (pVfs: CPointer, fileId: CInteger, flags: CInteger) => CInteger;
+	sqlite3_wasm_io_file_size: (pVfs: CPointer, fileId: CInteger, pSize: CPointer) => CInteger;
+	sqlite3_wasm_io_lock: (pVfs: CPointer, fileId: CInteger, locktype: CInteger) => CInteger;
+	sqlite3_wasm_io_unlock: (pVfs: CPointer, fileId: CInteger, locktype: CInteger) => CInteger;
+	sqlite3_wasm_io_check_reserved_lock: (pVfs: CPointer, fileId: CInteger, pResOut: CPointer) => CInteger;
+	sqlite3_wasm_io_file_control: (pVfs: CPointer, fileId: CInteger, op: CInteger, pArg: CPointer) => CInteger;
+	sqlite3_wasm_io_sector_size: (pVfs: CPointer, fileId: CInteger) => CInteger;
+	sqlite3_wasm_io_device_characteristics: (pVfs: CPointer, fileId: CInteger) => CInteger;
+	sqlite3_wasm_vfs_open: (pVfs: CPointer, zName: CString, pOutfileId: CPointer, flags: CInteger, pOutFlags: CPointer) => CInteger;
+	sqlite3_wasm_vfs_delete: (pVfs: CPointer, zName: CString, syncDir: CInteger) => CInteger;
+	sqlite3_wasm_vfs_access: (pVfs: CPointer, zName: CString, flags: CInteger, pResOut: CPointer) => CInteger;
+	sqlite3_wasm_vfs_full_pathname: (pVfs: CPointer, zName: CString, nOut: CInteger, zOut: CPointer) => CInteger;
+	sqlite3_wasm_vfs_randomness: (pVfs: CPointer, nByte: CInteger, zOut: CPointer) => CInteger;
+	sqlite3_wasm_vfs_sleep: (pVfs: CPointer, microseconds: CInteger) => CInteger;
+	sqlite3_wasm_vfs_current_time: (pVfs: CPointer, pTimeOut: CPointer) => CInteger;
+	sqlite3_wasm_vfs_get_last_error: (pVfs: CPointer, nByte: CInteger, zOut: CPointer) => CInteger;
 }
 
 export class SQLiteUnimplementedImportError extends Error {
@@ -362,27 +365,27 @@ export class SQLiteUnimplementedImportError extends Error {
 }
 
 export const unimplementedImports: SQLiteImports = {
-	sqlite3_ext_os_init: () => { throw new SQLiteUnimplementedImportError("sqlite3_ext_os_init") },
-	sqlite3_ext_os_end: () => { throw new SQLiteUnimplementedImportError("sqlite3_ext_os_end") },
-	sqlite3_ext_exec_callback: () => { throw new SQLiteUnimplementedImportError("sqlite3_ext_exec_callback") },
-	sqlite3_ext_io_close: () => { throw new SQLiteUnimplementedImportError("sqlite3_ext_io_close") },
-	sqlite3_ext_io_read: () => { throw new SQLiteUnimplementedImportError("sqlite3_ext_io_read") },
-	sqlite3_ext_io_write: () => { throw new SQLiteUnimplementedImportError("sqlite3_ext_io_write") },
-	sqlite3_ext_io_truncate: () => { throw new SQLiteUnimplementedImportError("sqlite3_ext_io_truncate") },
-	sqlite3_ext_io_sync: () => { throw new SQLiteUnimplementedImportError("sqlite3_ext_io_sync") },
-	sqlite3_ext_io_file_size: () => { throw new SQLiteUnimplementedImportError("sqlite3_ext_io_file_size") },
-	sqlite3_ext_io_lock: () => { throw new SQLiteUnimplementedImportError("sqlite3_ext_io_lock") },
-	sqlite3_ext_io_unlock: () => { throw new SQLiteUnimplementedImportError("sqlite3_ext_io_unlock") },
-	sqlite3_ext_io_check_reserved_lock: () => { throw new SQLiteUnimplementedImportError("sqlite3_ext_io_check_reserved_lock") },
-	sqlite3_ext_io_file_control: () => { throw new SQLiteUnimplementedImportError("sqlite3_ext_io_file_control") },
-	sqlite3_ext_io_sector_size: () => { throw new SQLiteUnimplementedImportError("sqlite3_ext_io_sector_size") },
-	sqlite3_ext_io_device_characteristics: () => { throw new SQLiteUnimplementedImportError("sqlite3_ext_io_device_characteristics") },
-	sqlite3_ext_vfs_open: () => { throw new SQLiteUnimplementedImportError("sqlite3_ext_vfs_open") },
-	sqlite3_ext_vfs_delete: () => { throw new SQLiteUnimplementedImportError("sqlite3_ext_vfs_delete") },
-	sqlite3_ext_vfs_access: () => { throw new SQLiteUnimplementedImportError("sqlite3_ext_vfs_access") },
-	sqlite3_ext_vfs_full_pathname: () => { throw new SQLiteUnimplementedImportError("sqlite3_ext_vfs_full_pathname") },
-	sqlite3_ext_vfs_randomness: () => { throw new SQLiteUnimplementedImportError("sqlite3_ext_vfs_randomness") },
-	sqlite3_ext_vfs_sleep: () => { throw new SQLiteUnimplementedImportError("sqlite3_ext_vfs_sleep") },
-	sqlite3_ext_vfs_current_time: () => { throw new SQLiteUnimplementedImportError("sqlite3_ext_vfs_current_time") },
-	sqlite3_ext_vfs_get_last_error: () => { throw new SQLiteUnimplementedImportError("sqlite3_ext_vfs_get_last_error") },
+	sqlite3_wasm_os_init: () => { throw new SQLiteUnimplementedImportError("sqlite3_wasm_os_init") },
+	sqlite3_wasm_os_end: () => { throw new SQLiteUnimplementedImportError("sqlite3_wasm_os_end") },
+	sqlite3_wasm_exec_callback: () => { throw new SQLiteUnimplementedImportError("sqlite3_wasm_exec_callback") },
+	sqlite3_wasm_io_close: () => { throw new SQLiteUnimplementedImportError("sqlite3_wasm_io_close") },
+	sqlite3_wasm_io_read: () => { throw new SQLiteUnimplementedImportError("sqlite3_wasm_io_read") },
+	sqlite3_wasm_io_write: () => { throw new SQLiteUnimplementedImportError("sqlite3_wasm_io_write") },
+	sqlite3_wasm_io_truncate: () => { throw new SQLiteUnimplementedImportError("sqlite3_wasm_io_truncate") },
+	sqlite3_wasm_io_sync: () => { throw new SQLiteUnimplementedImportError("sqlite3_wasm_io_sync") },
+	sqlite3_wasm_io_file_size: () => { throw new SQLiteUnimplementedImportError("sqlite3_wasm_io_file_size") },
+	sqlite3_wasm_io_lock: () => { throw new SQLiteUnimplementedImportError("sqlite3_wasm_io_lock") },
+	sqlite3_wasm_io_unlock: () => { throw new SQLiteUnimplementedImportError("sqlite3_wasm_io_unlock") },
+	sqlite3_wasm_io_check_reserved_lock: () => { throw new SQLiteUnimplementedImportError("sqlite3_wasm_io_check_reserved_lock") },
+	sqlite3_wasm_io_file_control: () => { throw new SQLiteUnimplementedImportError("sqlite3_wasm_io_file_control") },
+	sqlite3_wasm_io_sector_size: () => { throw new SQLiteUnimplementedImportError("sqlite3_wasm_io_sector_size") },
+	sqlite3_wasm_io_device_characteristics: () => { throw new SQLiteUnimplementedImportError("sqlite3_wasm_io_device_characteristics") },
+	sqlite3_wasm_vfs_open: () => { throw new SQLiteUnimplementedImportError("sqlite3_wasm_vfs_open") },
+	sqlite3_wasm_vfs_delete: () => { throw new SQLiteUnimplementedImportError("sqlite3_wasm_vfs_delete") },
+	sqlite3_wasm_vfs_access: () => { throw new SQLiteUnimplementedImportError("sqlite3_wasm_vfs_access") },
+	sqlite3_wasm_vfs_full_pathname: () => { throw new SQLiteUnimplementedImportError("sqlite3_wasm_vfs_full_pathname") },
+	sqlite3_wasm_vfs_randomness: () => { throw new SQLiteUnimplementedImportError("sqlite3_wasm_vfs_randomness") },
+	sqlite3_wasm_vfs_sleep: () => { throw new SQLiteUnimplementedImportError("sqlite3_wasm_vfs_sleep") },
+	sqlite3_wasm_vfs_current_time: () => { throw new SQLiteUnimplementedImportError("sqlite3_wasm_vfs_current_time") },
+	sqlite3_wasm_vfs_get_last_error: () => { throw new SQLiteUnimplementedImportError("sqlite3_wasm_vfs_get_last_error") },
 };

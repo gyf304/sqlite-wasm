@@ -1,2 +1,3 @@
 export * from "./sqlite";
-export * from "./constants";
+export { SQLiteError as Error } from "./utils";
+export * as constants from "./constants";

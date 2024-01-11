@@ -26,7 +26,4 @@ export const JSVFS: VFS = {
 	currentTime() {
 		return Date.now() / 86400000 + 2440587.5;
 	},
-	getLastError() {
-		return prevError;
-	},
 }

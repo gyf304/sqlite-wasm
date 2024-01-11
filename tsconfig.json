@@ -4,11 +4,13 @@
 		"lib": ["es2020", "dom"],
 		"types": ["bun-types"],
 		"module": "ESNext",
+		"moduleResolution": "Bundler",
 		"skipLibCheck": true,
+		"stripInternal": true,
 		"strict": true,
-		"outDir": "./dist/cjs",
-		"rootDir": "./src",
+		"noEmit": true,
+		"rootDir": "./",
 		"declaration": true,
 	},
-	"include": ["src"]
+	"include": ["src", "scripts/repl.ts"]
 }

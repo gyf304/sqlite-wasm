@@ -61,12 +61,6 @@ export interface VFS {
 	 * @throws {SQLiteError} If the current time could not be retrieved
 	 */
 	currentTime: () => number;
-
-	/**
-	 * Gets the last error
-	 * @returns The last error
-	 */
-	getLastError: () => SQLiteError;
 }
 
 export interface VFSFile {

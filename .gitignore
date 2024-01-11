@@ -1,5 +1,7 @@
 *.o
 *.wasm
+*.dwarf
+
 node_modules
 .vscode
 
@@ -18,3 +20,5 @@ node_modules
 *.db
 bun.lockb
 *.tgz
+
+.DS_Store

@@ -1,92 +1,95 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "sqlite3.c"
 #include "sqlite3wasm.h"
 
 #ifndef MAX_EXT_VFS
 #define MAX_EXT_VFS 32
 #endif
 
-typedef struct sqlite3_ext_file sqlite3_ext_file;
-struct sqlite3_ext_file
+typedef struct sqlite3_wasm_file sqlite3_wasm_file;
+struct sqlite3_wasm_file
 {
 	sqlite3_file base;
 	sqlite3_vfs *pVfs;
 	int fileId;
 };
 
+static sqlite3_api_routines patchedSqlite3Apis;
+
 static int io_close(sqlite3_file *pFile)
 {
-	sqlite3_ext_file *p = (sqlite3_ext_file *)pFile;
-	int rc = sqlite3_ext_io_close(p->pVfs, p->fileId);
+	sqlite3_wasm_file *p = (sqlite3_wasm_file *)pFile;
+	int rc = sqlite3_wasm_io_close(p->pVfs, p->fileId);
 	sqlite3_free(p);
 	return rc;
 }
 
 static int io_read(sqlite3_file *pFile, void *pBuf, int iAmt, sqlite3_int64 iOfst)
 {
-	sqlite3_ext_file *p = (sqlite3_ext_file *)pFile;
-	return sqlite3_ext_io_read(p->pVfs, p->fileId, pBuf, iAmt, iOfst);
+	sqlite3_wasm_file *p = (sqlite3_wasm_file *)pFile;
+	return sqlite3_wasm_io_read(p->pVfs, p->fileId, pBuf, iAmt, iOfst);
 }
 
 static int io_write(sqlite3_file *pFile, const void *pBuf, int iAmt, sqlite3_int64 iOfst)
 {
-	sqlite3_ext_file *p = (sqlite3_ext_file *)pFile;
-	return sqlite3_ext_io_write(p->pVfs, p->fileId, pBuf, iAmt, iOfst);
+	sqlite3_wasm_file *p = (sqlite3_wasm_file *)pFile;
+	return sqlite3_wasm_io_write(p->pVfs, p->fileId, pBuf, iAmt, iOfst);
 }
 
 static int io_truncate(sqlite3_file *pFile, sqlite3_int64 size)
 {
-	sqlite3_ext_file *p = (sqlite3_ext_file *)pFile;
-	return sqlite3_ext_io_truncate(p->pVfs, p->fileId, size);
+	sqlite3_wasm_file *p = (sqlite3_wasm_file *)pFile;
+	return sqlite3_wasm_io_truncate(p->pVfs, p->fileId, size);
 }
 
 static int io_sync(sqlite3_file *pFile, int flags)
 {
-	sqlite3_ext_file *p = (sqlite3_ext_file *)pFile;
-	return sqlite3_ext_io_sync(p->pVfs, p->fileId, flags);
+	sqlite3_wasm_file *p = (sqlite3_wasm_file *)pFile;
+	return sqlite3_wasm_io_sync(p->pVfs, p->fileId, flags);
 }
 
 static int io_file_size(sqlite3_file *pFile, sqlite3_int64 *pSize)
 {
-	sqlite3_ext_file *p = (sqlite3_ext_file *)pFile;
-	return sqlite3_ext_io_file_size(p->pVfs, p->fileId, pSize);
+	sqlite3_wasm_file *p = (sqlite3_wasm_file *)pFile;
+	return sqlite3_wasm_io_file_size(p->pVfs, p->fileId, pSize);
 }
 
 static int io_lock(sqlite3_file *pFile, int locktype)
 {
-	sqlite3_ext_file *p = (sqlite3_ext_file *)pFile;
-	return sqlite3_ext_io_lock(p->pVfs, p->fileId, locktype);
+	sqlite3_wasm_file *p = (sqlite3_wasm_file *)pFile;
+	return sqlite3_wasm_io_lock(p->pVfs, p->fileId, locktype);
 }
 
 static int io_unlock(sqlite3_file *pFile, int locktype)
 {
-	sqlite3_ext_file *p = (sqlite3_ext_file *)pFile;
-	return sqlite3_ext_io_unlock(p->pVfs, p->fileId, locktype);
+	sqlite3_wasm_file *p = (sqlite3_wasm_file *)pFile;
+	return sqlite3_wasm_io_unlock(p->pVfs, p->fileId, locktype);
 }
 
 static int io_check_reserved_lock(sqlite3_file *pFile, int *pResOut)
 {
-	sqlite3_ext_file *p = (sqlite3_ext_file *)pFile;
-	return sqlite3_ext_io_check_reserved_lock(p->pVfs, p->fileId, pResOut);
+	sqlite3_wasm_file *p = (sqlite3_wasm_file *)pFile;
+	return sqlite3_wasm_io_check_reserved_lock(p->pVfs, p->fileId, pResOut);
 }
 
 static int io_file_control(sqlite3_file *pFile, int op, void *pArg)
 {
-	sqlite3_ext_file *p = (sqlite3_ext_file *)pFile;
-	return sqlite3_ext_io_file_control(p->pVfs, p->fileId, op, pArg);
+	sqlite3_wasm_file *p = (sqlite3_wasm_file *)pFile;
+	return sqlite3_wasm_io_file_control(p->pVfs, p->fileId, op, pArg);
 }
 
 static int io_sector_size(sqlite3_file *pFile)
 {
-	sqlite3_ext_file *p = (sqlite3_ext_file *)pFile;
-	return sqlite3_ext_io_sector_size(p->pVfs, p->fileId);
+	sqlite3_wasm_file *p = (sqlite3_wasm_file *)pFile;
+	return sqlite3_wasm_io_sector_size(p->pVfs, p->fileId);
 }
 
 static int io_device_characteristics(sqlite3_file *pFile)
 {
-	sqlite3_ext_file *p = (sqlite3_ext_file *)pFile;
-	return sqlite3_ext_io_device_characteristics(p->pVfs, p->fileId);
+	sqlite3_wasm_file *p = (sqlite3_wasm_file *)pFile;
+	return sqlite3_wasm_io_device_characteristics(p->pVfs, p->fileId);
 }
 
 static sqlite3_io_methods io_methods = {
@@ -108,13 +111,13 @@ static sqlite3_io_methods io_methods = {
 static int vfs_open(sqlite3_vfs *pVfs, const char *zName, sqlite3_file *file, int flags, int *pOutFlags)
 {
 	int fileId = 0;
-	int rc = sqlite3_ext_vfs_open(pVfs, zName, &fileId, flags, pOutFlags);
+	int rc = sqlite3_wasm_vfs_open(pVfs, zName, &fileId, flags, pOutFlags);
 	if (fileId == 0) {
 		return SQLITE_MISUSE;
 	}
 	if (rc == SQLITE_OK)
 	{
-		sqlite3_ext_file *ext = (sqlite3_ext_file *)file;
+		sqlite3_wasm_file *ext = (sqlite3_wasm_file *)file;
 		ext->base.pMethods = &io_methods;
 		ext->pVfs = pVfs;
 		ext->fileId = fileId;
@@ -124,17 +127,17 @@ static int vfs_open(sqlite3_vfs *pVfs, const char *zName, sqlite3_file *file, in
 
 static int vfs_delete(sqlite3_vfs *pVfs, const char *zName, int syncDir)
 {
-	return sqlite3_ext_vfs_delete(pVfs, zName, syncDir);
+	return sqlite3_wasm_vfs_delete(pVfs, zName, syncDir);
 }
 
 static int vfs_access(sqlite3_vfs *pVfs, const char *zName, int flags, int *pResOut)
 {
-	return sqlite3_ext_vfs_access(pVfs, zName, flags, pResOut);
+	return sqlite3_wasm_vfs_access(pVfs, zName, flags, pResOut);
 }
 
 static int vfs_full_pathname(sqlite3_vfs *pVfs, const char *zName, int nOut, char *zOut)
 {
-	return sqlite3_ext_vfs_full_pathname(pVfs, zName, nOut, zOut);
+	return sqlite3_wasm_vfs_full_pathname(pVfs, zName, nOut, zOut);
 }
 
 static void *vfs_dlopen(sqlite3_vfs *pVfs, const char *zFilename)
@@ -153,30 +156,35 @@ static void vfs_dlerror(sqlite3_vfs *pVfs, int nByte, char *zErrMsg)
 
 static int vfs_randomness(sqlite3_vfs *pVfs, int nByte, char *zOut)
 {
-	return sqlite3_ext_vfs_randomness(pVfs, nByte, zOut);
+	return sqlite3_wasm_vfs_randomness(pVfs, nByte, zOut);
 }
 
 static int vfs_sleep(sqlite3_vfs *pVfs, int microseconds)
 {
-	return sqlite3_ext_vfs_sleep(pVfs, microseconds);
+	return sqlite3_wasm_vfs_sleep(pVfs, microseconds);
 }
 
 static int vfs_current_time(sqlite3_vfs *pVfs, double *pTimeOut)
 {
-	return sqlite3_ext_vfs_current_time(pVfs, pTimeOut);
+	return sqlite3_wasm_vfs_current_time(pVfs, pTimeOut);
 }
 
 static int vfs_get_last_error(sqlite3_vfs *pVfs, int nByte, char *zOut)
 {
-	return sqlite3_ext_vfs_get_last_error(pVfs, nByte, zOut);
+	return sqlite3_wasm_vfs_get_last_error(pVfs, nByte, zOut);
 }
 
 static int exec_callback(void *pArg, int nCols, char **azCols, char **azColNames)
 {
-	return sqlite3_ext_exec_callback((int)pArg, nCols, azCols, azColNames);
+	return sqlite3_wasm_exec_callback((int)pArg, nCols, azCols, azColNames);
 }
 
-int sqlite3_ext_vfs_register(const char *name, int makeDflt, sqlite3_vfs **ppOutVfs)
+static void free_workaround(void *p) {
+	/* I have no idea why this is necessary */
+	sqlite3_free(p);
+}
+
+int sqlite3_wasm_vfs_register(const char *name, int makeDflt, sqlite3_vfs **ppOutVfs)
 {
 	if (ppOutVfs == NULL) {
 		return SQLITE_MISUSE;
@@ -200,7 +208,7 @@ int sqlite3_ext_vfs_register(const char *name, int makeDflt, sqlite3_vfs **ppOut
 	strcpy(nameCopy, name);
 
 	pVfs->iVersion = 1;
-	pVfs->szOsFile = sizeof(sqlite3_ext_file);
+	pVfs->szOsFile = sizeof(sqlite3_wasm_file);
 	pVfs->mxPathname = 256;
 	pVfs->zName = nameCopy;
 	pVfs->pAppData = 0;
@@ -231,7 +239,7 @@ int sqlite3_ext_vfs_register(const char *name, int makeDflt, sqlite3_vfs **ppOut
 	return rc;
 }
 
-int sqlite3_ext_vfs_unregister(sqlite3_vfs *pVfs)
+int sqlite3_wasm_vfs_unregister(sqlite3_vfs *pVfs)
 {
 	int rc = sqlite3_vfs_unregister(pVfs);
 	if (rc == SQLITE_OK) {
@@ -243,15 +251,21 @@ int sqlite3_ext_vfs_unregister(sqlite3_vfs *pVfs)
 
 int sqlite3_os_init()
 {
-	return sqlite3_ext_os_init();
+	return sqlite3_wasm_os_init();
 }
 
 int sqlite3_os_end()
 {
-	return sqlite3_ext_os_end();
+	return sqlite3_wasm_os_end();
 }
 
-int sqlite3_ext_exec(sqlite3 *db, const char *sql, int id, char **errmsg)
+int sqlite3_wasm_exec(sqlite3 *db, const char *sql, int id, char **errmsg)
 {
 	return sqlite3_exec(db, sql, exec_callback, (void *)id, errmsg);
+}
+
+sqlite3_api_routines *sqlite3_get_api_routines() {
+	patchedSqlite3Apis = sqlite3Apis;
+	patchedSqlite3Apis.free = &free_workaround;
+	return &patchedSqlite3Apis;
 }
