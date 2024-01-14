@@ -59,15 +59,6 @@ export class SQLiteUtils {
 		return this.exports.sqlite3_malloc(size);
 	}
 
-	public calloc(size: number): number {
-		const ptr = this.malloc(size);
-		if (ptr === 0) {
-			return 0;
-		}
-		this.u8.fill(0, ptr, ptr + size);
-		return ptr;
-	}
-
 	public free(ptr: number): void {
 		this.exports.sqlite3_free(ptr);
 	}

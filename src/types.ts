@@ -14,6 +14,8 @@ export function toScalar(value: ExtendedScalar): Scalar {
 		case "object":
 			if (value === null) {
 				return null;
+			} else if (value instanceof ArrayBuffer) {
+				return value;
 			} else if ("toJSON" in value) {
 				const val = value.toJSON();
 				if (typeof val === "boolean") {

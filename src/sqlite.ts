@@ -3,20 +3,12 @@ import { ResultCode, Datatype, SyncFlag, LockLevel, AccessFlag, OpenFlag, VERSIO
 
 import * as constants from "./constants";
 import { SQLiteError, toScalar } from "./types";
-import { SQLiteUtils } from "./utils";
+import { SQLiteUtils, mustGet } from "./utils";
 import { VFS, VFSFile } from "./vfs/index";
 import { JSVFS } from "./vfs/js";
 
 import type { ExtendedScalar, Scalar } from "./types";
 import type { Function } from "./func";
-
-function mustGet<T, K>(map: Map<T, K>, key: T): K {
-	const value = map.get(key);
-	if (value === undefined) {
-		throw new Error(`No value for ${key}`);
-	}
-	return value;
-}
 
 export class SQLite {
 	private readonly instance: WebAssembly.Instance;
@@ -196,7 +188,8 @@ export class SQLite {
 				return sqlite.utils.functionShim(func.step!, pCtx, iArgc, ppArgv);
 			},
 			sqlite3_wasm_function_final(pCtx) {
-				const func = mustGet(sqlite._funcMap, pCtx);
+				const funcId = sqlite.exports.sqlite3_user_data(pCtx);
+				const func = mustGet(sqlite._funcMap, funcId);
 				return sqlite.utils.functionShim(func.final!, pCtx);
 			},
 			sqlite3_wasm_function_value(pCtx) {

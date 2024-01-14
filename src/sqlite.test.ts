@@ -233,6 +233,44 @@ describe("SQLite", function () {
 		db.close();
 	});
 
+	it("should support bindInt", async function () {
+		const db = await initDb();
+		const stmt = db.prepare("SELECT ?")!;
+		stmt.bindInt(1, 1);
+		const columnCount = stmt.columnCount();
+		expect(columnCount).toBe(1);
+		while (stmt.step()) {
+			for (let i = 0; i < columnCount; i++) {
+				const col = stmt.columnInt(i);
+				expect(col).toBe(1);
+			}
+		}
+		stmt.finalize();
+		db.close();
+	});
+
+	it("should support arraybuffer", async function () {
+		const db = await initDb();
+		const stmt = db.prepare("SELECT ?")!;
+		const blob = new ArrayBuffer(1);
+		stmt.bindValues(blob);
+		const columnCount = stmt.columnCount();
+		expect(columnCount).toBe(1);
+		while (stmt.step()) {
+			for (let i = 0; i < columnCount; i++) {
+				const col = stmt.columnBlob(i);
+				expect(col).toBeInstanceOf(ArrayBuffer);
+				expect(col.byteLength).toBe(1);
+				const col2 = stmt.columnValue(i);
+				expect(col2).toBeInstanceOf(ArrayBuffer);
+				const col3 = stmt.columnValue(i, true);
+				expect(col3).toBeInstanceOf(ArrayBuffer);
+			}
+		}
+		stmt.finalize();
+		db.close();
+	});
+
 	it("should serialize and deserialize", async function() {
 		const db = await initDb();
 		db.exec("CREATE TABLE test (id INTEGER PRIMARY KEY, value TEXT)");
@@ -325,6 +363,52 @@ describe("SQLite", function () {
 		sqlite.unregisterVFS(NodeVFS);
 	});
 
+	it("should support iterator", async () => {
+		const db = await initDb();
+		db.exec("CREATE TABLE test (id INTEGER PRIMARY KEY, value TEXT)");
+		db.exec("INSERT INTO test (value) VALUES ('hello')");
+		db.exec("INSERT INTO test (value) VALUES ('hello')");
+		db.exec("INSERT INTO test (value) VALUES ('hello')");
+
+		const stmt = db.prepare("SELECT * FROM test")!;
+		let count = 0;
+		for (const row of stmt.exec()) {
+			expect(row).toBeArrayOfSize(2);
+			count++;
+		}
+		expect(count).toBe(3);
+		stmt.finalize();
+
+		db.close();
+	});
+
+	describe("Application Defined SQL Functions", () => {
+		it("should support scalar function", async function() {
+			const db = await initDb();
+			db.createFunction("hello", (name) => `hello ${name}`);
+			db.exec("SELECT hello('test')", (_, cols) => {
+				expect(cols[0]).toBe("hello test");
+			});
+			db.close();
+		});
+
+		it("should support aggregate function", async function() {
+			const db = await initDb();
+			let count = 0;
+			db.createFunction("testcount", {
+				step: () => count++,
+				final: () => BigInt(count),
+			});
+			db.exec("CREATE TABLE test (id INTEGER PRIMARY KEY, value TEXT)");
+			db.exec("INSERT INTO test (value) VALUES ('hello')");
+			db.exec("INSERT INTO test (value) VALUES ('hello')");
+			db.exec("SELECT testcount(*) FROM test", (_, cols) => {
+				expect(cols[0]).toBe("2");
+			});
+			db.close();
+		});
+	}),
+
 	describe("NodeVFS", async function() {
 		const sqlite = await initSQLite();
 		sqlite.registerVFS(NodeVFS, true);
@@ -355,25 +439,6 @@ describe("SQLite", function () {
 			db.exec("DELETE FROM test;")
 			db.exec("VACUUM");
 		});
-	});
-
-	describe("Supports iterator", async () => {
-		const db = await initDb();
-		db.exec("CREATE TABLE test (id INTEGER PRIMARY KEY, value TEXT)");
-		db.exec("INSERT INTO test (value) VALUES ('hello')");
-		db.exec("INSERT INTO test (value) VALUES ('hello')");
-		db.exec("INSERT INTO test (value) VALUES ('hello')");
-
-		const stmt = db.prepare("SELECT * FROM test")!;
-		let count = 0;
-		for (const row of stmt.exec()) {
-			expect(row).toBeArrayOfSize(2);
-			count++;
-		}
-		expect(count).toBe(3);
-		stmt.finalize();
-
-		db.close();
 	});
 
 	// describe("FTS5", () => {
