@@ -359,8 +359,9 @@ describe("SQLite", function () {
 
 	it("should be able to register and unregister vfs", async function() {
 		const sqlite = await initSQLite();
-		sqlite.registerVFS(NodeVFS);
-		sqlite.unregisterVFS(NodeVFS);
+		const nodeVFS = new NodeVFS();
+		sqlite.registerVFS(nodeVFS);
+		sqlite.unregisterVFS(nodeVFS);
 	});
 
 	it("should support iterator", async () => {
@@ -411,7 +412,8 @@ describe("SQLite", function () {
 
 	describe("NodeVFS", async function() {
 		const sqlite = await initSQLite();
-		sqlite.registerVFS(NodeVFS, true);
+		const vfs = new NodeVFS();
+		sqlite.registerVFS(vfs, true);
 		// delete file if exists
 		await fs.rm("test.db", { force: true });
 		const db = sqlite.open("test.db");

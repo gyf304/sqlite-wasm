@@ -8,6 +8,10 @@ import * as constants from "../constants.js";
 
 const xhrExistCache = new Map<string, boolean>();
 
+interface InstantiableVFS extends VFS {
+	new (): VFS;
+}
+
 class XHRVFSFile implements VFSFile {
 	private cachedSize: number | undefined;
 	constructor(readonly url: string, readonly openFlags: number) {}
@@ -88,10 +92,12 @@ class XHRVFSFile implements VFSFile {
 	}
 }
 
-export const XHRVFS: VFS = {
-	...JSVFS,
-	name: "xhr",
-	open(path, flags) {
+export class XHRVFS extends JSVFS implements VFS {
+	constructor(name: string = "xhr") {
+		super(name);
+	}
+
+	public open(path: string, flags: number) {
 		const supportedFlags = 0
 			| constants.OPEN_READONLY
 			| constants.OPEN_MAIN_DB
@@ -103,14 +109,17 @@ export const XHRVFS: VFS = {
 		const url = new URL(path, location.href);
 		url.search = "";
 		return new XHRVFSFile(url.href, flags);
-	},
-	fullPathname(p) {
+	}
+
+	public fullPathname(p: string) {
 		return p;
-	},
-	randomness(buffer) {
+	}
+
+	public randomness(buffer: Uint8Array) {
 		crypto.getRandomValues(buffer);
-	},
-	access(path, flags) {
+	}
+
+	public access(path: string, flags: number) {
 		const url = new URL(path, location.href);
 		const mode = url.searchParams.get("mode");
 		if (mode !== null && mode !== "ro") {
@@ -134,8 +143,9 @@ export const XHRVFS: VFS = {
 				}
 		}
 		return result;
-	},
-	delete() {
+	}
+
+	public delete() {
 		throw new SQLiteError(ResultCode.IOERR);
 	}
 }

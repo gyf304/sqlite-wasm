@@ -211,7 +211,7 @@ export class SQLite {
 				const pName = sqlite.utils.cString(JSVFS.name);
 				const rc = sqlite.exports.sqlite3_wasm_vfs_register(pName, 1, pId);
 				const id = sqlite.utils.deref32(pId);
-				sqlite._vfsMap.set(id, JSVFS);
+				sqlite._vfsMap.set(id, new JSVFS());
 				sqlite.utils.free(pName);
 				sqlite.utils.free(pId);
 				sqlite.utils.checkError(rc);

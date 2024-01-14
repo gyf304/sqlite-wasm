@@ -1,6 +1,6 @@
 import { ResultCode } from "../constants.js";
 import { SQLiteError } from "../types.js";
-import type { VFS } from "./index.js";
+import type { VFS, VFSFile } from "./index.js";
 
 let prevError: SQLiteError = new SQLiteError(ResultCode.OK);
 
@@ -9,21 +9,36 @@ function ioerr(): never {
 	throw prevError;
 }
 
-export const JSVFS: VFS = {
-	name: "js",
-	open: ioerr,
-	delete: ioerr,
-	access: ioerr,
-	fullPathname: ioerr,
-	randomness(buffer) {
+export class JSVFS implements VFS {
+	constructor(public readonly name: string = "js") {}
+
+	public randomness(buffer: Uint8Array): void {
 		for (let i = 0; i < buffer.length; i++) {
 			buffer[i] = Math.random() * 256;
 		}
-	},
-	sleep() {
+	}
+
+	public sleep(ms: number): void {
 		return;
-	},
-	currentTime() {
+	}
+
+	public currentTime(): number {
 		return Date.now() / 86400000 + 2440587.5;
-	},
+	}
+
+	public open(path: string, flags: number): VFSFile {
+		ioerr();
+	}
+
+	public delete(path: string, syncDir: boolean): void {
+		ioerr();
+	}
+
+	public access(path: string, flags: number): boolean {
+		ioerr();
+	}
+
+	public fullPathname(path: string): string {
+		ioerr();
+	}
 }

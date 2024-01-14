@@ -1,3 +1,4 @@
+import * as crypto from "node:crypto";
 import * as fs from "node:fs";
 import * as path from "node:path";
 import * as constants from "node:constants";
@@ -76,10 +77,16 @@ class NodeVFSFile implements VFSFile {
 	}
 }
 
-export const NodeVFS: VFS = {
-	...JSVFS,
-	name: "node",
-	open(path, flags) {
+export class NodeVFS extends JSVFS implements VFS {
+	constructor(name: string = "node") {
+		super(name);
+	}
+
+	public randomness(buffer: Uint8Array): void {
+		crypto.randomFillSync(buffer);
+	}
+
+	public open(path: string, flags: number): VFSFile {
 		let ff = 0;
 		if (flags & OpenFlag.READONLY) {
 			ff |= constants.O_RDONLY;
@@ -91,15 +98,18 @@ export const NodeVFS: VFS = {
 		}
 		const f = fs.openSync(path, ff);
 		return new NodeVFSFile(f, flags);
-	},
-	fullPathname(p) {
+	}
+
+	public fullPathname(p: string): string {
 		return path.resolve(p);
-	},
-	access(path, flags) {
+	}
+
+	public access(path: string, flags: number): boolean {
 		const exists = fs.existsSync(path);
 		return exists;
-	},
-	delete(path, syncDir) {
+	}
+
+	public delete(path: string, syncDir: boolean): void {
 		fs.unlinkSync(path);
-	},
+	}
 }

@@ -7,7 +7,8 @@ import { NodeVFS } from "../src/vfs/node";
 const wasmFile = await fs.readFile("dist/wasm/sqlite3.wasm");
 const module = await WebAssembly.compile(wasmFile);
 const instance = await sqlite.SQLite.instantiate(module);
-instance.registerVFS(NodeVFS, true);
+const vfs = new NodeVFS();
+instance.registerVFS(vfs, true);
 let db: sqlite.Database = instance.open(":memory:");
 
 let version: string | null = null;
