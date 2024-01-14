@@ -8,6 +8,13 @@
 #define SQLITE_EXTRA_API
 #endif
 
+#define SQLITE_WASM_FUNC_MODE_SCALAR 0
+#define SQLITE_WASM_FUNC_MODE_AGGREGATE 1
+#define SQLITE_WASM_FUNC_MODE_WINDOW 2
+
+__attribute__((import_module("imports"),import_name("sqlite3_wasm_log")))
+SQLITE_IMPORTED_API void sqlite3_wasm_log(const char *zLog);
+
 __attribute__((import_module("imports"),import_name("sqlite3_wasm_os_init")))
 SQLITE_IMPORTED_API int sqlite3_wasm_os_init(void);
 
@@ -77,10 +84,30 @@ SQLITE_IMPORTED_API int sqlite3_wasm_vfs_current_time(sqlite3_vfs *pVfs, double 
 __attribute__((import_module("imports"),import_name("sqlite3_wasm_vfs_get_last_error")))
 SQLITE_IMPORTED_API int sqlite3_wasm_vfs_get_last_error(sqlite3_vfs *pVfs, int nByte, char *zOut);
 
+__attribute__((import_module("imports"),import_name("sqlite3_wasm_function_func")))
+SQLITE_IMPORTED_API void sqlite3_wasm_function_func(sqlite3_context *pCtx, int iArgc, sqlite3_value **ppArgv);
+
+__attribute__((import_module("imports"),import_name("sqlite3_wasm_function_step")))
+SQLITE_IMPORTED_API void sqlite3_wasm_function_step(sqlite3_context *pCtx, int iArgc, sqlite3_value **ppArgv);
+
+__attribute__((import_module("imports"),import_name("sqlite3_wasm_function_final")))
+SQLITE_IMPORTED_API void sqlite3_wasm_function_final(sqlite3_context *pCtx);
+
+__attribute__((import_module("imports"),import_name("sqlite3_wasm_function_value")))
+SQLITE_IMPORTED_API void sqlite3_wasm_function_value(sqlite3_context *pCtx);
+
+__attribute__((import_module("imports"),import_name("sqlite3_wasm_function_inverse")))
+SQLITE_IMPORTED_API void sqlite3_wasm_function_inverse(sqlite3_context *pCtx, int iArgc, sqlite3_value **ppArgv);
+
+__attribute__((import_module("imports"),import_name("sqlite3_wasm_function_destroy")))
+SQLITE_IMPORTED_API void sqlite3_wasm_function_destroy(void *pArg);
+
 SQLITE_EXTRA_API int sqlite3_wasm_vfs_register(const char *name, int makeDflt, sqlite3_vfs **ppOutVfs);
 
 SQLITE_EXTRA_API int sqlite3_wasm_vfs_unregister(sqlite3_vfs *pVfs);
 
+SQLITE_EXTRA_API int sqlite3_wasm_create_function(sqlite3 *db, const char *zFunctionName, int nArg, int eTextRep, int iFuncId, int mode);
+
 SQLITE_EXTRA_API int sqlite3_wasm_exec(sqlite3 *db, const char *sql, int id, char **errmsg);
 
-SQLITE_EXTRA_API sqlite3_api_routines *sqlite3_get_api_routines();
+SQLITE_EXTRA_API const sqlite3_api_routines *sqlite3_get_api_routines();

@@ -10,7 +10,15 @@ const instance = await sqlite.SQLite.instantiate(module);
 instance.registerVFS(NodeVFS, true);
 let db: sqlite.Database = instance.open(":memory:");
 
-console.log(`SQLite-WASM version ${db.exec("SELECT sqlite_version()")[0][0].value}`);
+let version: string | null = null;
+db.exec("SELECT sqlite_version()", (_, cols) => {
+	version = cols[0]!;
+});
+if (version === null) {
+	throw new Error("Failed to get SQLite version");
+}
+
+console.log(`SQLite-WASM version ${version}`);
 console.log(`Enter ".help" for usage hints.`);
 
 const prompt = "sqlite> ";
@@ -78,19 +86,11 @@ const commands: Map<string, Command> = new Map(Object.entries({
 			db = instance.open(path);
 		},
 	},
-	load: {
-		args: ["PATH"],
-		help: "Loads a WASM extension",
-		impl: async (path: string) => {
-			const wasmBuffer = await fs.readFile(path);
-			const wasmModule = await WebAssembly.compile(wasmBuffer);
-			db.loadExtension(wasmModule);
-		},
-	},
 	exit: {
 		args: [],
 		help: "Exits the REPL",
 		impl: () => {
+			db.close();
 			process.exit(0);
 		},
 	},
@@ -98,6 +98,7 @@ const commands: Map<string, Command> = new Map(Object.entries({
 		args: [],
 		help: "Exits the REPL",
 		impl: () => {
+			db.close();
 			process.exit(0);
 		},
 	},
@@ -144,12 +145,9 @@ for await (const line of rlAiter()) {
 		try {
 			sql += line;
 			if (sql.trim().endsWith(";")) {
-				const result = db.exec(sql);
-				if (result !== undefined && result.length > 0) {
-					for (const row of result) {
-						console.log(row.map((col) => col.value ?? "").join("|"));
-					}
-				}
+				db.exec(sql, (_, cols) => {
+					console.log(cols.join("|"));
+				});
 				sql = "";
 			}
 		} catch (err) {

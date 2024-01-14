@@ -1,7 +1,7 @@
 /// <reference lib="dom" />
 
 import { AccessFlag, ExtendedResultCode, LockLevel, OpenFlag, ResultCode } from "../constants.js";
-import { SQLiteError } from "../utils.js";
+import { SQLiteError } from "../types.js";
 import type { VFS, VFSFile } from "./index.js";
 import { JSVFS } from "./js.js";
 import * as constants from "../constants.js";

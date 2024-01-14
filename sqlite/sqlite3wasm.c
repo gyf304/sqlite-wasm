@@ -1,7 +1,15 @@
 #include <stdlib.h>
 #include <string.h>
 
+#ifndef SQLITE_IMPORTED_API
+#define SQLITE_IMPORTED_API
+#endif
+
+__attribute__((import_module("imports"),import_name("sqlite3_wasm_log")))
+SQLITE_IMPORTED_API void sqlite3_wasm_log(const char *zLog);
+
 #include "sqlite3.c"
+#include "sqlite3exts.c"
 #include "sqlite3wasm.h"
 
 #ifndef MAX_EXT_VFS
@@ -179,11 +187,6 @@ static int exec_callback(void *pArg, int nCols, char **azCols, char **azColNames
 	return sqlite3_wasm_exec_callback((int)pArg, nCols, azCols, azColNames);
 }
 
-static void free_workaround(void *p) {
-	/* I have no idea why this is necessary */
-	sqlite3_free(p);
-}
-
 int sqlite3_wasm_vfs_register(const char *name, int makeDflt, sqlite3_vfs **ppOutVfs)
 {
 	if (ppOutVfs == NULL) {
@@ -249,6 +252,37 @@ int sqlite3_wasm_vfs_unregister(sqlite3_vfs *pVfs)
 	return rc;
 }
 
+int sqlite3_wasm_create_function(sqlite3 *db, const char *zFunctionName, int nArg, int eTextRep, int iFuncId, int mode) {
+	switch (mode) {
+		case SQLITE_WASM_FUNC_MODE_SCALAR:
+			return sqlite3_create_function_v2(
+				db, zFunctionName, nArg, eTextRep, (void *)iFuncId,
+				sqlite3_wasm_function_func,
+				NULL,
+				NULL,
+				sqlite3_wasm_function_destroy
+			);
+		case SQLITE_WASM_FUNC_MODE_AGGREGATE:
+			return sqlite3_create_function(
+				db, zFunctionName, nArg, eTextRep, (void *)iFuncId,
+				NULL,
+				sqlite3_wasm_function_step,
+				sqlite3_wasm_function_final
+			);
+		case SQLITE_WASM_FUNC_MODE_WINDOW:
+			return sqlite3_create_window_function(
+				db, zFunctionName, nArg, eTextRep, (void *)iFuncId,
+				sqlite3_wasm_function_step,
+				sqlite3_wasm_function_final,
+				sqlite3_wasm_function_value,
+				sqlite3_wasm_function_inverse,
+				sqlite3_wasm_function_destroy
+			);
+		default:
+			return SQLITE_MISUSE;
+	}
+}
+
 int sqlite3_os_init()
 {
 	return sqlite3_wasm_os_init();
@@ -264,8 +298,6 @@ int sqlite3_wasm_exec(sqlite3 *db, const char *sql, int id, char **errmsg)
 	return sqlite3_exec(db, sql, exec_callback, (void *)id, errmsg);
 }
 
-sqlite3_api_routines *sqlite3_get_api_routines() {
-	patchedSqlite3Apis = sqlite3Apis;
-	patchedSqlite3Apis.free = &free_workaround;
-	return &patchedSqlite3Apis;
+SQLITE_EXTRA_API const sqlite3_api_routines *sqlite3_get_api_routines() {
+	return &sqlite3Apis;
 }

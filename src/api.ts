@@ -322,17 +322,17 @@ export interface SQLiteExports extends WebAssembly.Exports {
 	sqlite3changegroup_output_strm: (a: CPointer, xOutput: CFunctionPointer, pOut: CPointer) => CInteger;
 	sqlite3rebaser_rebase_strm: (pRebaser: CPointer, xInput: CFunctionPointer, pIn: CPointer, xOutput: CFunctionPointer, pOut: CPointer) => CInteger;
 	sqlite3session_config: (op: CInteger, pArg: CPointer) => CInteger;
-	sqlite3_dummy: () => void;
-	sqlite3_get_api_routines: () => CPointer;
-	sqlite3_get_free: () => CPointer;
 	sqlite3_wasm_vfs_register: (name: CString, makeDflt: CInteger, c: CPointer) => CInteger;
 	sqlite3_wasm_vfs_unregister: (pVfs: CPointer) => CInteger;
+	sqlite3_wasm_create_function: (db: CPointer, zFunctionName: CString, nArg: CInteger, eTextRep: CInteger, iFuncId: CInteger, mode: CInteger) => CInteger;
 	sqlite3_wasm_exec: (db: CPointer, sql: CString, id: CInteger, d: CPointer) => CInteger;
+	sqlite3_get_api_routines: () => CPointer;
 
 	memory: WebAssembly.Memory;
 }
 
 export interface SQLiteImports {
+	sqlite3_wasm_log: (zLog: CString) => void;
 	sqlite3_wasm_os_init: () => CInteger;
 	sqlite3_wasm_os_end: () => CInteger;
 	sqlite3_wasm_exec_callback: (id: CInteger, nCols: CInteger, azCols: CPointer, azColNames: CPointer) => CInteger;
@@ -356,6 +356,12 @@ export interface SQLiteImports {
 	sqlite3_wasm_vfs_sleep: (pVfs: CPointer, microseconds: CInteger) => CInteger;
 	sqlite3_wasm_vfs_current_time: (pVfs: CPointer, pTimeOut: CPointer) => CInteger;
 	sqlite3_wasm_vfs_get_last_error: (pVfs: CPointer, nByte: CInteger, zOut: CPointer) => CInteger;
+	sqlite3_wasm_function_func: (pCtx: CPointer, iArgc: CInteger, c: CPointer) => void;
+	sqlite3_wasm_function_step: (pCtx: CPointer, iArgc: CInteger, c: CPointer) => void;
+	sqlite3_wasm_function_final: (pCtx: CPointer) => void;
+	sqlite3_wasm_function_value: (pCtx: CPointer) => void;
+	sqlite3_wasm_function_inverse: (pCtx: CPointer, iArgc: CInteger, c: CPointer) => void;
+	sqlite3_wasm_function_destroy: (pArg: CPointer) => void;
 }
 
 export class SQLiteUnimplementedImportError extends Error {
@@ -365,6 +371,7 @@ export class SQLiteUnimplementedImportError extends Error {
 }
 
 export const unimplementedImports: SQLiteImports = {
+	sqlite3_wasm_log: () => { throw new SQLiteUnimplementedImportError("sqlite3_wasm_log") },
 	sqlite3_wasm_os_init: () => { throw new SQLiteUnimplementedImportError("sqlite3_wasm_os_init") },
 	sqlite3_wasm_os_end: () => { throw new SQLiteUnimplementedImportError("sqlite3_wasm_os_end") },
 	sqlite3_wasm_exec_callback: () => { throw new SQLiteUnimplementedImportError("sqlite3_wasm_exec_callback") },
@@ -388,4 +395,10 @@ export const unimplementedImports: SQLiteImports = {
 	sqlite3_wasm_vfs_sleep: () => { throw new SQLiteUnimplementedImportError("sqlite3_wasm_vfs_sleep") },
 	sqlite3_wasm_vfs_current_time: () => { throw new SQLiteUnimplementedImportError("sqlite3_wasm_vfs_current_time") },
 	sqlite3_wasm_vfs_get_last_error: () => { throw new SQLiteUnimplementedImportError("sqlite3_wasm_vfs_get_last_error") },
+	sqlite3_wasm_function_func: () => { throw new SQLiteUnimplementedImportError("sqlite3_wasm_function_func") },
+	sqlite3_wasm_function_step: () => { throw new SQLiteUnimplementedImportError("sqlite3_wasm_function_step") },
+	sqlite3_wasm_function_final: () => { throw new SQLiteUnimplementedImportError("sqlite3_wasm_function_final") },
+	sqlite3_wasm_function_value: () => { throw new SQLiteUnimplementedImportError("sqlite3_wasm_function_value") },
+	sqlite3_wasm_function_inverse: () => { throw new SQLiteUnimplementedImportError("sqlite3_wasm_function_inverse") },
+	sqlite3_wasm_function_destroy: () => { throw new SQLiteUnimplementedImportError("sqlite3_wasm_function_destroy") },
 };

@@ -181,12 +181,10 @@ function genPlaceholder(api: SqliteApiInfo) {
 async function main() {
 	const sqliteHeaderFilename = "./sqlite/sqlite3.h";
 	const sqliteWasmHeaderFilename = "./sqlite/sqlite3wasm.h";
-	const sqliteExtraFilename = "./sqlite/sqlite3extra.c";
 	const sqliteHeader = await fs.readFile(sqliteHeaderFilename, { encoding: "ascii" });
 	const sqliteWasmHeader = await fs.readFile(sqliteWasmHeaderFilename, { encoding: "ascii" });
-	const sqliteExtra = await fs.readFile(sqliteExtraFilename, { encoding: "ascii" });
 
-	const apis = extractApis(sqliteHeader).concat(extractApis(sqliteExtra));
+	const apis = extractApis(sqliteHeader);
 	const wasmApis = extractApis(sqliteWasmHeader);
 
 	const exportApis = apis.concat(wasmApis).filter((api) => api.apiType === "SQLITE_API" || api.apiType === "SQLITE_EXTRA_API");

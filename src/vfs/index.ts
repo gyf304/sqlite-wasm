@@ -1,5 +1,5 @@
 import { AccessFlag, LockLevel, SyncFlag } from "../constants";
-import type { SQLiteError } from "../utils";
+import type { SQLiteError } from "../types";
 
 export interface VFS {
 	/**

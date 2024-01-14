@@ -12,9 +12,14 @@
 
 #include <stddef.h>
 #include "sqlite3ext.h"
+
+#ifndef SQLITE_PRIVATE
+#define SQLITE_PRIVATE static
+#endif
+
 SQLITE_EXTENSION_INIT1
 
-static void noopFunc(
+static void noopImplFunc(
 	sqlite3_context *context,
 	int argc,
 	sqlite3_value **argv
@@ -22,10 +27,10 @@ static void noopFunc(
 	sqlite3_result_value(context, argv[0]);
 }
 
-static int vfsNoopInit(sqlite3 *db) {
+static int noopInit(sqlite3 *db) {
 	int rc = SQLITE_OK;
 
-	rc = sqlite3_create_function(db, "noop", 1, SQLITE_UTF8|SQLITE_DETERMINISTIC, NULL, noopFunc, NULL, NULL);
+	rc = sqlite3_create_function(db, "noop", 1, SQLITE_UTF8|SQLITE_DETERMINISTIC, NULL, noopImplFunc, NULL, NULL);
 	if (rc != SQLITE_OK) {
 		return rc;
 	}
@@ -40,10 +45,10 @@ __declspec(dllexport)
 int sqlite3_noop_init(sqlite3 *db, char **pzErrMsg, const sqlite3_api_routines *pApi) {
 	SQLITE_EXTENSION_INIT2(pApi);
 	(void)pzErrMsg; /* unused */
-	return vfsNoopInit(db);
+	return noopInit(db);
 }
 #else
-int sqlite3VfsNoopInit(sqlite3 *db) {
-	return vfsNoopInit(db);
+SQLITE_PRIVATE int sqlite3NoopInit(sqlite3 *db) {
+	return noopInit(db);
 }
 #endif

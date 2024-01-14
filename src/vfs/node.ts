@@ -3,7 +3,7 @@ import * as path from "node:path";
 import * as constants from "node:constants";
 
 import { ExtendedResultCode, LockLevel, OpenFlag, ResultCode } from "../constants.js";
-import { SQLiteError } from "../utils.js";
+import { SQLiteError } from "../types.js";
 import type { VFS, VFSFile } from "./index.js";
 import { JSVFS } from "./js.js";
 

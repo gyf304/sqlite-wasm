@@ -4,7 +4,6 @@ import { SQLite } from "./sqlite.js";
 import { ResultCode } from "./constants.js";
 import { NodeVFS } from "./vfs/node.js";
 import * as constants from "./constants.js";
-import { generateHeapSnapshot } from "bun";
 
 async function initModule() {
 	const wasm = await fs.readFile("./sqlite/sqlite3.wasm");
@@ -152,8 +151,9 @@ describe("SQLite", function () {
 		db.exec("INSERT INTO test (value) VALUES ('hello')");
 		db.exec("INSERT INTO test (value) VALUES ('hello')");
 		db.exec("INSERT INTO test (value) VALUES ('hello')");
-		const rows = db.exec("SELECT SQLITE_VERSION(); SELECT * FROM test;");
-		expect(rows.length).toBe(4);
+		let count = 0;
+		db.exec("SELECT SQLITE_VERSION(); SELECT * FROM test;", () => count++);
+		expect(count).toBe(4);
 		db.close();
 	});
 
@@ -338,20 +338,41 @@ describe("SQLite", function () {
 			db.exec("INSERT INTO test (value) VALUES ('hello')");
 			db.exec("INSERT INTO test (value) VALUES ('hello')");
 			db.exec("INSERT INTO test (value) VALUES ('hello')");
-			const rows = db.exec("SELECT * FROM test;");
-			expect(rows.length).toBe(3);
+			let count = 0;
+			db.exec("SELECT * FROM test;", () => count++);
+			expect(count).toBe(3);
 		});
 		it("should handle a lot of insertions", function() {
 			for (let i = 0; i < 1000; i++) {
 				db.exec("INSERT INTO test (value) VALUES ('hello')");
 			}
-			const rows = db.exec("SELECT * FROM test;");
-			expect(rows.length).toBe(1003);
+			let count = 0;
+			db.exec("SELECT * FROM test;", () => count++);
+			expect(count).toBe(1003);
 		});
 		it("should handle vacuum", function() {
 			db.exec("DELETE FROM test;")
 			db.exec("VACUUM");
 		});
+	});
+
+	describe("Supports iterator", async () => {
+		const db = await initDb();
+		db.exec("CREATE TABLE test (id INTEGER PRIMARY KEY, value TEXT)");
+		db.exec("INSERT INTO test (value) VALUES ('hello')");
+		db.exec("INSERT INTO test (value) VALUES ('hello')");
+		db.exec("INSERT INTO test (value) VALUES ('hello')");
+
+		const stmt = db.prepare("SELECT * FROM test")!;
+		let count = 0;
+		for (const row of stmt.exec()) {
+			expect(row).toBeArrayOfSize(2);
+			count++;
+		}
+		expect(count).toBe(3);
+		stmt.finalize();
+
+		db.close();
 	});
 
 	// describe("FTS5", () => {

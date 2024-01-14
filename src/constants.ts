@@ -466,6 +466,9 @@ export const CHANGESET_OMIT = 0;
 export const CHANGESET_REPLACE = 1;
 export const CHANGESET_ABORT = 2;
 export const SESSION_CONFIG_STRMSIZE = 1;
+export const WASM_FUNC_MODE_SCALAR = 0;
+export const WASM_FUNC_MODE_AGGREGATE = 1;
+export const WASM_FUNC_MODE_WINDOW = 2;
 
 export const ResultCode = {
 	"OK": OK,

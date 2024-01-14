@@ -101,7 +101,6 @@ for (const [group, names] of groups) {
 	} else {
 		commonPrefix = "";
 	}
-	console.log(group, commonPrefix);
 	for (const name of names) {
 		outLines.push(`\t"${name.slice(commonPrefix.length)}": ${name},\n`);
 	}

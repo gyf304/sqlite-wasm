@@ -3,7 +3,7 @@ WASI_LIBCLANG_RT_PATH ?= $(shell echo "$(WASI_SDK_PATH)/lib/clang"/*/lib/wasi/li
 CC = "${WASI_SDK_PATH}/bin/clang"
 LD = "${WASI_SDK_PATH}/bin/wasm-ld"
 
-CFLAGS = -x c -Os -flto --target=wasm32 --sysroot=${WASI_SDK_PATH}/share/wasi-sysroot \
+CFLAGS = -x c -Os -fPIC --target=wasm32 --sysroot=${WASI_SDK_PATH}/share/wasi-sysroot \
 	-D__wasi_api_h '-DEXPORT=__attribute__((visibility("default")))' \
 	-Wpoison-system-directories -Wall -Wno-unused-variable -Werror \
 	-Isqlite
@@ -11,7 +11,7 @@ CFLAGS = -x c -Os -flto --target=wasm32 --sysroot=${WASI_SDK_PATH}/share/wasi-sy
 LDFLAGS = -m wasm32 -L$(WASI_SDK_PATH)/share/wasi-sysroot/lib/wasm32-wasi --no-entry -lc -lm \
 	--export-dynamic "$(WASI_LIBCLANG_RT_PATH)"
 
-SQLITE_EXTENSIONS = $(patsubst %.c,%.wasm,$(wildcard exts/*.c))
+# SQLITE_EXTENSIONS = $(patsubst %.c,%.wasm,$(wildcard exts/*.c))
 
 SQLITE_FLAGS = \
 	-DSQLITE_DEFAULT_MEMSTATUS=0 \
@@ -27,6 +27,7 @@ SQLITE_FLAGS = \
 	-DSQLITE_OMIT_SHARED_CACHE \
 	-DSQLITE_OMIT_UTF16 \
 	-DSQLITE_OS_OTHER=1 \
+	-DSQLITE_EXTRA_AUTOEXT=sqlite3_extra_autoext \
 	-DSQLITE_THREADSAFE=0
 
 .PHONY: all clean update
@@ -45,18 +46,18 @@ sqlite3ext.h:
 sqlite3.c:
 	../scripts/update-sqlite.sh
 
-sqlite3wasm.o: sqlite3wasm.c sqlite3.c sqlite3wasm.h sqlite3.h
+sqlite3wasm.o: sqlite3wasm.c sqlite3.c sqlite3exts.c sqlite3wasm.h sqlite3.h
 	$(CC) $(CFLAGS) $(SQLITE_FLAGS) \
 		'-DSQLITE_API=__attribute__((visibility("default")))' \
 		'-DSQLITE_EXTRA_API=__attribute__((visibility("default")))' \
 		-c sqlite3wasm.c \
 		-o sqlite3wasm.o
 
-sqlite3.wasm: sqlite3wasm.o
-	$(LD) $(LDFLAGS) --export-table -o $@ $^
+sqlite3exts.c: $(wildcard exts/*.c)
+	../scripts/genexts.sh $^ > $@
 
-exts/%.wasm: exts/%.o
-	$(LD) $(LDFLAGS) --import-table --import-memory -o $@ $^
+sqlite3.wasm: sqlite3wasm.o
+	$(LD) $(LDFLAGS) -o $@ $^
 
 exts/%.o: exts/%.c sqlite3.h sqlite3ext.h
 	$(CC) $(CFLAGS) \

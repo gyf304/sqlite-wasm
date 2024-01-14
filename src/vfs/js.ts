@@ -1,5 +1,5 @@
 import { ResultCode } from "../constants.js";
-import { SQLiteError } from "../utils.js";
+import { SQLiteError } from "../types.js";
 import type { VFS } from "./index.js";
 
 let prevError: SQLiteError = new SQLiteError(ResultCode.OK);
