@@ -565,22 +565,23 @@ export class Statement {
 
 	public bindValue(i: number, value: ExtendedScalar): void {
 		const scalar = toScalar(value);
-		if (scalar === null) {
-			return this.bindNull(i);
+		switch (typeof scalar) {
+			case "bigint":
+				return this.bindInt64(i, scalar);
+			case "number":
+				return this.bindDouble(i, scalar);
+			case "string":
+				return this.bindText(i, scalar);
+			case "object":
+				if (scalar === null) {
+					return this.bindNull(i);
+				} else if (scalar instanceof ArrayBuffer) {
+					return this.bindBlob(i, scalar);
+				}
+				throw new Error(`Unsupported object type: ${scalar}`);
+			default:
+				throw new Error(`Unsupported type: ${typeof scalar}`);
 		}
-		if (typeof scalar === "string") {
-			return this.bindText(i, scalar);
-		}
-		if (typeof scalar === "number") {
-			return this.bindDouble(i, scalar);
-		}
-		if (typeof scalar === "bigint") {
-			return this.bindInt64(i, scalar);
-		}
-		if (scalar instanceof ArrayBuffer) {
-			return this.bindBlob(i, scalar);
-		}
-		throw new Error(`Unsupported type ${typeof value}: ${value}`);
 	}
 
 	public bindValues(...values: ExtendedScalar[]): void {
@@ -707,7 +708,7 @@ export class Statement {
 		return this;
 	}
 
-	public *exec(...values: ExtendedScalar[]): Iterable<Scalar[]> {
+	public exec(...values: ExtendedScalar[]): Iterable<Scalar[]> {
 		this.reset();
 		this.bindValues(...values);
 		return this;

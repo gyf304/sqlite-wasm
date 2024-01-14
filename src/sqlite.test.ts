@@ -140,7 +140,8 @@ describe("SQLite", function () {
 	it("should throw if binding unsupported type", async function() {
 		const db = await initDb();
 		const stmt = db.prepare("SELECT ?")!;
-		expect(() => stmt.bindValues({} as any)).toThrow();
+		const symbol = Symbol();
+		expect(() => stmt.bindValues(symbol as any)).toThrow();
 		stmt.finalize();
 		db.close();
 	});
