@@ -445,18 +445,19 @@ describe("SQLite", function () {
 		});
 	});
 
-	// describe("FTS5", () => {
-	// 	it("should create fts5 table", async function() {
-	// 		const db = await initDb();
-	// 		db.exec("CREATE VIRTUAL TABLE test USING fts5(value, tokenize = 'html unicode61 remove_diacritics 1')");
-	// 		db.exec("INSERT INTO test (value) VALUES ('hello')");
-	// 		db.exec("INSERT INTO test (value) VALUES ('hello')");
-	// 		db.exec("INSERT INTO test (value) VALUES ('hello')");
-	// 		const rows = db.exec("SELECT * FROM test;");
-	// 		expect(rows.length).toBe(3);
-	// 		db.close();
-	// 	});
-	// });
+	describe("FTS5", () => {
+		it("should create fts5 table", async function() {
+			const db = await initDb();
+			db.exec("CREATE VIRTUAL TABLE test USING fts5(value, tokenize = 'unicode61 remove_diacritics 1')");
+			db.exec("INSERT INTO test (value) VALUES ('hello')");
+			db.exec("INSERT INTO test (value) VALUES ('hello')");
+			db.exec("INSERT INTO test (value) VALUES ('hello')");
+			let count = 0;
+			db.exec("SELECT * FROM test;", () => count++);
+			expect(count).toBe(3);
+			db.close();
+		});
+	});
 
 	describe("Utilities", () => {
 		it("should handle noop checkError", async function() {
